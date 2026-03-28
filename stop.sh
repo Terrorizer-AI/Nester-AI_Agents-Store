@@ -43,12 +43,28 @@ if [ -f /tmp/nester-frontend.pid ]; then
     rm -f /tmp/nester-frontend.pid
 fi
 
+if [ -f /tmp/nester-linkedin-mcp.pid ]; then
+    pid=$(cat /tmp/nester-linkedin-mcp.pid)
+    if kill "$pid" 2>/dev/null; then
+        ok "LinkedIn MCP stopped (PID $pid)"
+        stopped=$((stopped + 1))
+    fi
+    rm -f /tmp/nester-linkedin-mcp.pid
+fi
+
 # ── Kill anything still on our ports ─────────────────────────────────────────
 
 backend_pids=$(lsof -ti:8000 2>/dev/null || true)
 if [ -n "$backend_pids" ]; then
     echo "$backend_pids" | xargs kill 2>/dev/null || true
     ok "Killed processes on port 8000"
+    stopped=$((stopped + 1))
+fi
+
+linkedin_pids=$(lsof -ti:8001 2>/dev/null || true)
+if [ -n "$linkedin_pids" ]; then
+    echo "$linkedin_pids" | xargs kill 2>/dev/null || true
+    ok "Killed processes on port 8001"
     stopped=$((stopped + 1))
 fi
 

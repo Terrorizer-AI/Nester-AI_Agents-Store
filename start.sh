@@ -66,9 +66,17 @@ if [ -f /tmp/nester-frontend.pid ]; then
     rm -f /tmp/nester-frontend.pid
 fi
 
+# Kill LinkedIn MCP if running
+if [ -f /tmp/nester-linkedin-mcp.pid ]; then
+    old_pid=$(cat /tmp/nester-linkedin-mcp.pid)
+    kill "$old_pid" 2>/dev/null && info "Stopped old LinkedIn MCP (PID $old_pid)" || true
+    rm -f /tmp/nester-linkedin-mcp.pid
+fi
+
 # Also kill anything lingering on our ports
 lsof -ti:8000 2>/dev/null | xargs kill 2>/dev/null || true
 lsof -ti:3000 2>/dev/null | xargs kill 2>/dev/null || true
+lsof -ti:8001 2>/dev/null | xargs kill 2>/dev/null || true
 sleep 1
 
 # ── Start backend ────────────────────────────────────────────────────────────
@@ -77,6 +85,12 @@ source .venv/bin/activate
 nohup python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload > /tmp/nester-backend.log 2>&1 &
 echo $! > /tmp/nester-backend.pid
 ok "Backend starting (PID $!)"
+
+# ── Start LinkedIn MCP server ─────────────────────────────────────────────────
+
+nohup linkedin-mcp-server --transport streamable-http --host 0.0.0.0 --port 8001 > /tmp/nester-linkedin-mcp.log 2>&1 &
+echo $! > /tmp/nester-linkedin-mcp.pid
+ok "LinkedIn MCP starting (PID $!) → port 8001"
 
 # ── Start frontend ───────────────────────────────────────────────────────────
 

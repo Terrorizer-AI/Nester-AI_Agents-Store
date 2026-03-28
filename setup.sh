@@ -217,6 +217,31 @@ info "Installing Playwright Chromium (for LinkedIn research)..."
 python -m playwright install chromium --quiet 2>/dev/null || python -m playwright install chromium
 ok "Playwright browser ready"
 
+info "Installing Patchright browser (for LinkedIn MCP)..."
+python -m patchright install chromium 2>/dev/null || true
+ok "LinkedIn browser ready"
+
+# ── Step 3b: LinkedIn Login ──────────────────────────────────────────────────
+
+step "LinkedIn Login (one-time)"
+
+echo ""
+echo -e "  ${BOLD}Nester uses your LinkedIn session to research prospects.${NC}"
+echo -e "  ${DIM}A browser window will open — log in to LinkedIn as you normally would.${NC}"
+echo -e "  ${DIM}This only needs to be done once. Your session is saved locally.${NC}"
+echo ""
+
+# Check if already logged in
+if linkedin-mcp-server --status 2>/dev/null | grep -qi "logged in"; then
+    ok "Already logged into LinkedIn"
+else
+    echo -ne "  ${BOLD}Press Enter to open LinkedIn login...${NC}"
+    read -r
+    linkedin-mcp-server --login --no-headless 2>/dev/null || true
+    echo ""
+    ok "LinkedIn login complete"
+fi
+
 # ── Step 4: Frontend Dependencies ────────────────────────────────────────────
 
 step "Setting up frontend"
@@ -353,6 +378,11 @@ source .venv/bin/activate
 nohup python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload > /tmp/nester-backend.log 2>&1 &
 echo $! > /tmp/nester-backend.pid
 ok "Backend starting on port 8000"
+
+info "Starting LinkedIn MCP server..."
+nohup linkedin-mcp-server --transport streamable-http --host 0.0.0.0 --port 8001 > /tmp/nester-linkedin-mcp.log 2>&1 &
+echo $! > /tmp/nester-linkedin-mcp.pid
+ok "LinkedIn MCP starting on port 8001"
 
 info "Starting frontend..."
 cd "$PROJECT_DIR/frontend"

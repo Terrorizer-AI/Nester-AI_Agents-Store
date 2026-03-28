@@ -60,9 +60,10 @@ The wizard will:
 
 1. **Check your system** — installs Python & Node.js if missing
 2. **Install dependencies** — sets up everything automatically
-3. **Ask for your API keys** — just paste them when prompted
-4. **Configure your email** — for sending outreach (optional)
-5. **Start the platform** — opens it in your browser
+3. **LinkedIn login** — a browser opens, you log into LinkedIn once (session is saved)
+4. **Ask for your API keys** — just paste them when prompted
+5. **Configure your email** — for sending outreach (optional)
+6. **Start the platform** — opens it in your browser
 
 > The wizard uses colored indicators so you can see progress:
 > - ✓ Green = done
