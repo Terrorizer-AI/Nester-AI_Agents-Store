@@ -77,7 +77,7 @@ fi
 lsof -ti:8000 2>/dev/null | xargs kill 2>/dev/null || true
 lsof -ti:3000 2>/dev/null | xargs kill 2>/dev/null || true
 lsof -ti:8001 2>/dev/null | xargs kill 2>/dev/null || true
-sleep 1
+sleep 3  # Wait for ports to fully release
 
 # ── Start backend ────────────────────────────────────────────────────────────
 

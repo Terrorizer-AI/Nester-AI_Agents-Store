@@ -218,8 +218,14 @@ python -m playwright install chromium --quiet 2>/dev/null || python -m playwrigh
 ok "Playwright browser ready"
 
 info "Installing Patchright browser (for LinkedIn MCP)..."
-python -m patchright install chromium 2>/dev/null || true
-ok "LinkedIn browser ready"
+if python -m patchright install chromium 2>/dev/null; then
+    ok "LinkedIn browser ready"
+else
+    warn "Patchright browser install failed — trying pip install first..."
+    pip install --quiet patchright
+    python -m patchright install chromium
+    ok "LinkedIn browser ready"
+fi
 
 # ── Step 3b: LinkedIn Login ──────────────────────────────────────────────────
 
