@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+:root {
+  --background: #131318;
+  --foreground: #e4e1e9;
+  --card: #1f1f25;
+  --card-border: #2a292f;
+  --accent: #8083ff;
+  --accent-soft: #1a1a3e;
+  --accent-dim: #c0c1ff;
+  --secondary: #4edea3;
+  --tertiary: #ffb95f;
+  --surface-high: #2a292f;
+  --surface-low: #1b1b20;
+  --success: #4edea3;
+  --warning: #ffb95f;
+  --error: #ffb4ab;
+  --muted: #908fa0;
+  --outline: #464554;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-border: var(--card-border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-dim: var(--accent-dim);
+  --color-secondary: var(--secondary);
+  --color-tertiary: var(--tertiary);
+  --color-surface-high: var(--surface-high);
+  --color-surface-low: var(--surface-low);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-muted: var(--muted);
+  --color-outline: var(--outline);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #35343a; border-radius: 10px; }
+
+/* Animations */
+@keyframes pulse-ring {
+  0% { transform: scale(0.33); opacity: 1; }
+  80%, 100% { opacity: 0; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.animate-slide-up { animation: slide-up 0.35s ease-out both; }
+.animate-fade-in { animation: fade-in 0.3s ease-out both; }
+
+.skeleton {
+  background: linear-gradient(90deg, #1f1f25 25%, #2a292f 50%, #1f1f25 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Pulse dot for active pipeline node */
+.pulse-dot { position: relative; }
+.pulse-dot::before {
+  content: '';
+  position: absolute;
+  width: 300%; height: 300%;
+  left: -100%; top: -100%;
+  border-radius: 50%;
+  background-color: #8083ff;
+  animation: pulse-ring 1.5s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+}
+
+/* Glass effect */
+.glass { background: rgba(19, 19, 24, 0.75); backdrop-filter: blur(20px); }
+
+/* Input borderless focus style */
+.input-borderless {
+  background: #0e0e13;
+  border: none;
+  border-bottom: 1px solid #464554;
+  border-radius: 0;
+  transition: border-color 0.2s;
+}
+.input-borderless:focus {
+  outline: none;
+  border-bottom-color: #8083ff;
+}

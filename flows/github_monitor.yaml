@@ -1,0 +1,71 @@
+# GitHub Monitor Flow — 5 sequential agents
+# Trigger: webhook (real-time) + cron (every 6 hours)
+# Input: GitHub events via webhook queue OR API polling
+# Output: Alerts, metrics, weekly reports, automated actions
+
+name: github_monitor
+schema: schemas.github_monitor.GitHubMonitorState
+trigger: webhook+cron
+memory_namespace: "{org_id}/github_monitor/{session_id}"
+
+# Default cron: every 6 hours. Weekly report: Monday 9am.
+cron: "0 */6 * * *"
+weekly_report_cron: "0 9 * * 1"
+
+nodes:
+  - id: event_collector
+    type: event_collector
+    model_role: research
+    mcp_tools: [github_official, github_custom]
+    retry: 3
+    on_error: retry_then_skip
+    config:
+      max_events: 500
+      poll_hours: 6
+
+  - id: security_analyzer
+    type: security_analyzer
+    model_role: research
+    mcp_tools: [github_official]
+    retry: 3
+    on_error: retry_then_abort
+    config:
+      severity_threshold: medium
+      requeue_on_failure: true
+
+  - id: productivity_analyzer
+    type: productivity_analyzer
+    model_role: research
+    mcp_tools: [github_official, github_custom]
+    retry: 2
+    on_error: retry_then_skip
+    config:
+      metrics_window_days: 30
+
+  - id: intelligence_synthesizer
+    type: intelligence_synthesizer
+    model_role: synthesis
+    mcp_tools: []
+    retry: 1
+    on_error: retry_then_abort
+
+  - id: action_dispatcher
+    type: action_dispatcher
+    model_role: research
+    mcp_tools: [slack, github_official, email]
+    retry: 2
+    on_error: retry_then_skip
+    config:
+      auto_create_issues: true
+      auto_assign_reviewers: true
+      confidence_threshold: 0.7
+
+edges:
+  - from: event_collector
+    to: security_analyzer
+  - from: security_analyzer
+    to: productivity_analyzer
+  - from: productivity_analyzer
+    to: intelligence_synthesizer
+  - from: intelligence_synthesizer
+    to: action_dispatcher

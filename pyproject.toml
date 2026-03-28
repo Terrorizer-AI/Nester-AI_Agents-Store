@@ -1,0 +1,52 @@
+[project]
+name = "nester-platform"
+version = "0.1.0"
+description = "Nester Agent Platform — multi-agent infrastructure with LangGraph"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0,<1.0",
+    "uvicorn[standard]>=0.32.0,<1.0",
+    "pydantic>=2.10.0,<3.0",
+    "pydantic-settings>=2.7.0,<3.0",
+    "langgraph>=0.4.0,<1.0",
+    "langchain-core>=0.3.0,<1.0",
+    "langchain-openai>=0.3.0,<1.0",
+    "redis[hiredis]>=5.2.0,<6.0",
+    "supabase>=2.11.0,<3.0",
+    "taskiq>=0.11.0,<1.0",
+    "taskiq-redis>=1.0.0,<2.0",
+    "mcp>=1.0.0,<2.0",
+    "fastmcp>=0.4.0,<1.0",
+    "langfuse>=3.0.0,<4.0",
+    "apscheduler>=3.10.0,<4.0",
+    "pybreaker>=1.2.0,<2.0",
+    "pyyaml>=6.0,<7.0",
+    "watchdog>=6.0.0,<7.0",
+    "sse-starlette>=2.1.0,<3.0",
+    "httpx>=0.28.0,<1.0",
+    "python-dotenv>=1.0.0,<2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true

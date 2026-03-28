@@ -1,0 +1,200 @@
+# ── Nester Agent Platform — Docker Compose ────────────────────────────────────
+# Services: nester-api, redis, langfuse (v3 stack: 6 containers), mcp tool servers
+
+services:
+  # ── Nester API ──────────────────────────────────────────────────────────────
+  nester-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - NESTER_DATA_DIR=/data/nester
+      - LANGFUSE_HOST=http://langfuse-web:3000
+      - NO_PROXY=localhost,127.0.0.1,langfuse-web
+    volumes:
+      - nester-data:/data/nester
+    depends_on:
+      langfuse-web:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ── LinkedIn MCP Server (browser-based, no API key) ─────────────────────────
+  linkedin-mcp:
+    image: stickerdaniel/linkedin-mcp-server:latest
+    user: root
+    volumes:
+      - linkedin-session:/home/pwuser/.linkedin-mcp
+    command: ["--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8001", "--path", "/mcp"]
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    environment:
+      - HOME=/home/pwuser
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/mcp"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── Langfuse v3 — Web ──────────────────────────────────────────────────────
+  langfuse-web:
+    image: langfuse/langfuse:3
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@langfuse-db:5432/langfuse
+      - REDIS_CONNECTION_STRING=redis://langfuse-redis:6379
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_MIGRATION_URL=clickhouse://clickhouse:9000
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=nester-langfuse-secret-change-in-prod
+      - SALT=nester-langfuse-salt-change-in-prod
+      - LANGFUSE_INIT_ORG_ID=nester
+      - LANGFUSE_INIT_ORG_NAME=Nester
+      - LANGFUSE_INIT_PROJECT_ID=nester-platform
+      - LANGFUSE_INIT_PROJECT_NAME=Nester Platform
+      - LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-855ecba3-ca69-4cea-bc33-9bdd11b9a01b
+      - LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-62d5c132-5983-4a40-86e8-7636bbc061dd
+      - LANGFUSE_INIT_USER_EMAIL=admin@nester.dev
+      - LANGFUSE_INIT_USER_NAME=Admin
+      - LANGFUSE_INIT_USER_PASSWORD=nester-admin-change-in-prod
+      - LANGFUSE_S3_EVENT_UPLOAD_ENABLED=true
+      - LANGFUSE_S3_EVENT_UPLOAD_BUCKET=langfuse
+      - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://minio:9000
+      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=minioadmin
+      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=minioadmin
+      - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
+      - LANGFUSE_S3_EVENT_UPLOAD_REGION=auto
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio-create-bucket:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/public/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Langfuse v3 — Worker ────────────────────────────────────────────────────
+  langfuse-worker:
+    image: langfuse/langfuse:3
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@langfuse-db:5432/langfuse
+      - REDIS_CONNECTION_STRING=redis://langfuse-redis:6379
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_MIGRATION_URL=clickhouse://clickhouse:9000
+      - LANGFUSE_S3_EVENT_UPLOAD_ENABLED=true
+      - LANGFUSE_S3_EVENT_UPLOAD_BUCKET=langfuse
+      - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://minio:9000
+      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=minioadmin
+      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=minioadmin
+      - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
+      - LANGFUSE_S3_EVENT_UPLOAD_REGION=auto
+    command: ["node", "packages/worker/dist/index.js"]
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Langfuse — PostgreSQL ───────────────────────────────────────────────────
+  langfuse-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=langfuse
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - langfuse-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ── Langfuse — Redis ────────────────────────────────────────────────────────
+  langfuse-redis:
+    image: redis:7-alpine
+    volumes:
+      - langfuse-redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ── ClickHouse (Langfuse analytics) ─────────────────────────────────────────
+  clickhouse:
+    image: clickhouse/clickhouse-server:24
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    environment:
+      - CLICKHOUSE_DB=langfuse
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ── MinIO (Langfuse blob storage) ───────────────────────────────────────────
+  minio:
+    image: minio/minio
+    ports:
+      - "9090:9090"
+    volumes:
+      - minio-data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9090"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  minio-create-bucket:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      mc mb myminio/langfuse --ignore-existing;
+      exit 0;
+      "
+
+volumes:
+  nester-data:
+  linkedin-session:
+  langfuse-db-data:
+  langfuse-redis-data:
+  clickhouse-data:
+  minio-data:

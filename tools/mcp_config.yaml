@@ -1,0 +1,304 @@
+# MCP Tool Server Registry
+# Each entry defines an MCP server that agents can declare as a dependency.
+# The platform auto-connects agents to only the servers they need.
+# tools_provided now include schemas so LangChain can bind them to LLMs.
+
+servers:
+  - name: github_official
+    description: "Official GitHub MCP server — repos, PRs, issues, security alerts"
+    transport: stdio
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+    tools_provided:
+      - name: get_repo
+        description: "Get repository details including stars, forks, language, and description"
+        parameters:
+          type: object
+          properties:
+            owner: { type: string, description: "Repository owner" }
+            repo: { type: string, description: "Repository name" }
+          required: [owner, repo]
+      - name: list_pull_requests
+        description: "List pull requests for a repository with state filter"
+        parameters:
+          type: object
+          properties:
+            owner: { type: string, description: "Repository owner" }
+            repo: { type: string, description: "Repository name" }
+            state: { type: string, description: "PR state: open, closed, all", default: "open" }
+          required: [owner, repo]
+      - name: get_issues
+        description: "List issues for a repository"
+        parameters:
+          type: object
+          properties:
+            owner: { type: string, description: "Repository owner" }
+            repo: { type: string, description: "Repository name" }
+          required: [owner, repo]
+      - name: get_dependabot_alerts
+        description: "Get Dependabot security alerts for a repository"
+        parameters:
+          type: object
+          properties:
+            owner: { type: string, description: "Repository owner" }
+            repo: { type: string, description: "Repository name" }
+          required: [owner, repo]
+      - name: create_issue
+        description: "Create a new issue in a repository"
+        parameters:
+          type: object
+          properties:
+            owner: { type: string, description: "Repository owner" }
+            repo: { type: string, description: "Repository name" }
+            title: { type: string, description: "Issue title" }
+            body: { type: string, description: "Issue body" }
+          required: [owner, repo, title]
+      - name: assign_reviewer
+        description: "Request a review on a pull request"
+        parameters:
+          type: object
+          properties:
+            owner: { type: string, description: "Repository owner" }
+            repo: { type: string, description: "Repository name" }
+            pull_number: { type: integer, description: "PR number" }
+            reviewers: { type: array, items: { type: string }, description: "GitHub usernames" }
+          required: [owner, repo, pull_number, reviewers]
+    used_by: [github_monitor]
+    enabled: true
+
+  - name: github_custom
+    description: "Custom GitHub metrics — webhook queue, PR cycle time, commit velocity"
+    transport: http
+    url: "http://localhost:8100"
+    tools_provided:
+      - name: get_webhook_events
+        description: "Retrieve recent webhook events from the Redis queue"
+        parameters:
+          type: object
+          properties:
+            repo: { type: string, description: "Repository full name (owner/repo)" }
+            limit: { type: integer, description: "Max events to return", default: 50 }
+          required: [repo]
+      - name: compute_pr_metrics
+        description: "Compute PR cycle time, review turnaround, and merge rate for a repository"
+        parameters:
+          type: object
+          properties:
+            repo: { type: string, description: "Repository full name (owner/repo)" }
+            days: { type: integer, description: "Number of days to analyze", default: 30 }
+          required: [repo]
+      - name: compute_commit_velocity
+        description: "Compute commits per day and velocity trend for a repository"
+        parameters:
+          type: object
+          properties:
+            repo: { type: string, description: "Repository full name (owner/repo)" }
+            days: { type: integer, description: "Number of days to analyze", default: 30 }
+          required: [repo]
+      - name: get_review_bottlenecks
+        description: "Identify reviewers with slowest response times"
+        parameters:
+          type: object
+          properties:
+            repo: { type: string, description: "Repository full name (owner/repo)" }
+          required: [repo]
+    used_by: [github_monitor]
+    enabled: true
+
+  - name: linkedin
+    description: "LinkedIn scraper via browser automation — no API key needed"
+    transport: streamable-http
+    url: "http://localhost:8001/mcp"
+    source: "github.com/stickerdaniel/linkedin-mcp-server"
+    auth: none
+    rate_limit: 30
+    timeout_seconds: 30
+    tools_provided:
+      - name: get_person_profile
+        description: "Retrieve a person's full LinkedIn profile. Returns name, headline, title, company, location, experience, education, skills. The LLM should parse the raw text in each section."
+        parameters:
+          type: object
+          properties:
+            linkedin_username:
+              type: string
+              description: "LinkedIn username only (e.g. 'kunalshrivastava89', 'williamhgates') — NOT a full URL"
+            sections:
+              type: string
+              description: "Comma-separated extra sections: experience, education, interests, honors, languages, contact_info, posts. Default scrapes only the main profile page."
+          required: [linkedin_username]
+      - name: get_company_profile
+        description: "Retrieve a company's LinkedIn page. Returns overview, size, industry, specialties. The LLM should parse the raw text in each section."
+        parameters:
+          type: object
+          properties:
+            company_name:
+              type: string
+              description: "LinkedIn company name slug (e.g. 'microsoft', 'docker', 'anthropic')"
+            sections:
+              type: string
+              description: "Comma-separated extra sections: posts, jobs. Default scrapes only the about page."
+          required: [company_name]
+      - name: get_company_posts
+        description: "Retrieve recent posts from a company's LinkedIn feed. The LLM should parse the raw text to extract individual posts."
+        parameters:
+          type: object
+          properties:
+            company_name:
+              type: string
+              description: "LinkedIn company name slug (e.g. 'microsoft', 'docker', 'anthropic')"
+          required: [company_name]
+      - name: search_people
+        description: "Search LinkedIn for people matching keywords and optional location filter."
+        parameters:
+          type: object
+          properties:
+            keywords: { type: string, description: "Search keywords (e.g. 'software engineer', 'recruiter at Google')" }
+            location: { type: string, description: "Optional location filter (e.g. 'New York', 'Remote')" }
+          required: [keywords]
+      - name: search_jobs
+        description: "Search LinkedIn for job listings matching keywords"
+        parameters:
+          type: object
+          properties:
+            keywords: { type: string, description: "Job search keywords" }
+            location: { type: string, description: "Optional location filter" }
+          required: [keywords]
+      - name: get_job_details
+        description: "Get detailed information about a specific LinkedIn job listing"
+        parameters:
+          type: object
+          properties:
+            job_id: { type: string, description: "LinkedIn job ID (numeric string, e.g. '4252026496')" }
+          required: [job_id]
+    used_by: [sales_outreach]
+    enabled: true
+
+  - name: web_scraper
+    description: "Website extraction via Firecrawl"
+    transport: http
+    url: "http://localhost:8102"
+    tools_provided:
+      - name: extract_website
+        description: "Extract structured content from a website URL. Returns title, description, main content, links, and metadata."
+        parameters:
+          type: object
+          properties:
+            url: { type: string, description: "Website URL to scrape" }
+          required: [url]
+      - name: crawl_domain
+        description: "Crawl a domain and extract content from multiple pages"
+        parameters:
+          type: object
+          properties:
+            url: { type: string, description: "Starting URL" }
+            max_pages: { type: integer, description: "Max pages to crawl", default: 10 }
+          required: [url]
+      - name: extract_structured
+        description: "Extract structured data from a webpage using a schema"
+        parameters:
+          type: object
+          properties:
+            url: { type: string, description: "Website URL" }
+            schema: { type: object, description: "JSON schema for extraction" }
+          required: [url, schema]
+    used_by: [sales_outreach]
+    enabled: true
+
+  - name: slack
+    description: "Slack Bot API — send alerts, messages"
+    transport: http
+    url: "http://localhost:8103"
+    tools_provided:
+      - name: send_message
+        description: "Send a message to a Slack channel"
+        parameters:
+          type: object
+          properties:
+            channel: { type: string, description: "Slack channel name or ID" }
+            text: { type: string, description: "Message text" }
+          required: [channel, text]
+      - name: send_alert
+        description: "Send a formatted alert to a Slack channel with severity level"
+        parameters:
+          type: object
+          properties:
+            channel: { type: string, description: "Slack channel name or ID" }
+            title: { type: string, description: "Alert title" }
+            severity: { type: string, description: "Alert severity: critical, high, medium, low" }
+            body: { type: string, description: "Alert body" }
+          required: [channel, title, severity, body]
+      - name: create_channel_message
+        description: "Create a rich formatted message with blocks in a Slack channel"
+        parameters:
+          type: object
+          properties:
+            channel: { type: string, description: "Slack channel name or ID" }
+            blocks: { type: array, description: "Slack Block Kit blocks" }
+          required: [channel, blocks]
+    used_by: [github_monitor]
+    enabled: true
+
+  - name: email
+    description: "Email sending via SMTP"
+    transport: http
+    url: "http://localhost:8104"
+    tools_provided:
+      - name: send_email
+        description: "Send an email via SMTP"
+        parameters:
+          type: object
+          properties:
+            to: { type: string, description: "Recipient email address" }
+            subject: { type: string, description: "Email subject line" }
+            body: { type: string, description: "Email body (plain text or HTML)" }
+            html: { type: boolean, description: "Whether body is HTML", default: false }
+          required: [to, subject, body]
+      - name: validate_address
+        description: "Validate an email address format and deliverability"
+        parameters:
+          type: object
+          properties:
+            email: { type: string, description: "Email address to validate" }
+          required: [email]
+      - name: check_deliverability
+        description: "Check if an email address is deliverable via MX lookup"
+        parameters:
+          type: object
+          properties:
+            email: { type: string, description: "Email address to check" }
+          required: [email]
+    used_by: [sales_outreach]
+    enabled: true
+
+  - name: search
+    description: "Web search via Tavily"
+    transport: http
+    url: "http://localhost:8105"
+    tools_provided:
+      - name: web_search
+        description: "Search the web for information. Returns relevant results with titles, URLs, and content snippets."
+        parameters:
+          type: object
+          properties:
+            query: { type: string, description: "Search query" }
+            max_results: { type: integer, description: "Maximum number of results", default: 5 }
+          required: [query]
+      - name: news_search
+        description: "Search for recent news articles"
+        parameters:
+          type: object
+          properties:
+            query: { type: string, description: "News search query" }
+            max_results: { type: integer, description: "Maximum number of results", default: 5 }
+          required: [query]
+      - name: company_search
+        description: "Search for company information, funding, news, and market data"
+        parameters:
+          type: object
+          properties:
+            company_name: { type: string, description: "Company name to research" }
+          required: [company_name]
+    used_by: [sales_outreach, github_monitor]
+    enabled: true

@@ -1,0 +1,54 @@
+# ── Nester Agent Platform — Dependencies ──────────────────────────────────────
+
+# --- Core Framework ---
+fastapi>=0.115.0,<1.0
+uvicorn[standard]>=0.32.0,<1.0
+pydantic>=2.10.0,<3.0
+pydantic-settings>=2.7.0,<3.0
+
+# --- LangGraph + LangChain ---
+langgraph>=0.4.0,<1.0
+langchain-core>=0.3.0,<1.0
+langchain-openai>=0.3.0,<1.0
+
+# --- Agent Memory (Mem0 + Qdrant embedded + SQLite) ---
+mem0ai>=0.1.0,<1.0
+qdrant-client>=1.12.0,<2.0
+langgraph-checkpoint-sqlite>=2.0.0,<3.0
+
+# --- MCP (Model Context Protocol) ---
+mcp>=1.0.0,<2.0
+fastmcp>=0.4.0,<1.0
+
+# --- Observability ---
+langfuse>=3.0.0,<4.0
+
+# --- Scheduling ---
+apscheduler>=3.10.0,<4.0
+
+# --- Circuit Breaker ---
+pybreaker>=1.2.0,<2.0
+
+# --- YAML ---
+pyyaml>=6.0,<7.0
+
+# --- File Watching (hot-reload) ---
+watchdog>=6.0.0,<7.0
+
+# --- SSE ---
+sse-starlette>=2.1.0,<3.0
+
+# --- HTTP ---
+httpx>=0.28.0,<1.0
+aiohttp>=3.9.0,<4.0
+
+# --- Browser Automation ---
+playwright>=1.48.0,<2.0
+beautifulsoup4>=4.12.0,<5.0
+ddgs>=9.0.0,<10.0
+
+# --- Search ---
+tavily-python>=0.5.0,<1.0
+
+# --- Utilities ---
+python-dotenv>=1.0.0,<2.0

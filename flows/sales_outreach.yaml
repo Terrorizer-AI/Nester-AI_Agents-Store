@@ -1,0 +1,102 @@
+# Sales Outreach Flow — 7 nodes (3 run in parallel)
+# Trigger: on-demand (user clicks "Run" or API call)
+# Input: LinkedIn URL + optional company website + optional company LinkedIn URL + service catalog
+# Output: Personalized cold email with research summary
+#
+# Execution order:
+#   1. linkedin_researcher          (prospect personal profile)
+#   2a. company_researcher          ─┐
+#   2b. company_linkedin_researcher  ├─ all three run concurrently after step 1
+#   2c. activity_analyzer           ─┘
+#   3. persona_builder   (waits for all three to complete)
+#   4. service_matcher
+#   5. email_composer
+
+name: sales_outreach
+schema: schemas.sales_outreach.SalesOutreachState
+trigger: user
+memory_namespace: "{org_id}/sales_outreach/{session_id}"
+
+nodes:
+  - id: linkedin_researcher
+    type: linkedin_researcher
+    model_role: research
+    mcp_tools: [linkedin]
+    retry: 3
+    on_error: retry_then_skip
+    config:
+      data_points_target: 48
+
+  - id: company_researcher
+    type: company_researcher
+    model_role: research
+    mcp_tools: [web_scraper, search]
+    retry: 3
+    on_error: retry_then_skip
+
+  - id: company_linkedin_researcher
+    type: company_linkedin_researcher
+    model_role: research
+    mcp_tools: [linkedin]
+    retry: 3
+    on_error: retry_then_skip
+
+  - id: activity_analyzer
+    type: activity_analyzer
+    model_role: research
+    mcp_tools: [linkedin]
+    retry: 3
+    on_error: retry_then_skip
+    config:
+      posts_to_analyze: 10
+
+  - id: persona_builder
+    type: persona_builder
+    model_role: synthesis
+    mcp_tools: []
+    retry: 1
+    on_error: retry_then_abort
+
+  - id: service_matcher
+    type: service_matcher
+    model_role: synthesis
+    mcp_tools: []
+    retry: 1
+    on_error: retry_then_abort
+
+  - id: email_composer
+    type: email_composer
+    model_role: email
+    mcp_tools: []
+    retry: 2
+    on_error: retry_then_abort
+    config:
+      max_words: 150
+      tone: professional_warm
+      cta_type: low_commitment
+
+  - id: output_formatter
+    type: output_formatter
+    model_role: research   # uses nano model — cheap + fast
+    mcp_tools: []
+    retry: 1
+    on_error: retry_then_skip
+
+edges:
+  # Step 1 → fan-out to all three research branches in parallel
+  - from: linkedin_researcher
+    to: [company_researcher, company_linkedin_researcher, activity_analyzer]
+    type: parallel
+
+  # All three branches → join into persona_builder
+  - from: [company_researcher, company_linkedin_researcher, activity_analyzer]
+    to: persona_builder
+    type: join
+
+  # Sequential from persona_builder onward
+  - from: persona_builder
+    to: service_matcher
+  - from: service_matcher
+    to: email_composer
+  - from: email_composer
+    to: output_formatter
