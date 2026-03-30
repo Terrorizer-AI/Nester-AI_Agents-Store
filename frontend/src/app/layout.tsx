@@ -27,8 +27,8 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
         <nav className="fixed top-0 w-full z-50 glass border-b border-outline/20 h-14 flex items-center px-10 justify-between">
           <div className="flex items-center gap-10">
-            <a href="/" className="text-lg font-black tracking-tighter text-accent-dim">
-              Nester
+            <a href="/" className="flex items-center">
+              <img src="/nester-logo.svg" alt="Nester" className="h-6 invert" />
             </a>
             <div className="hidden md:flex gap-6">
               {[
@@ -50,8 +50,8 @@ export default function RootLayout({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center text-xs font-black text-accent-dim">
-              N
+            <div className="w-7 h-7 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center overflow-hidden">
+              <img src="/nester-logo.svg" alt="N" className="h-4 invert" />
             </div>
           </div>
         </nav>
