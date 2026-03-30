@@ -79,9 +79,9 @@ if [ -f /tmp/nester-linkedin-mcp.pid ]; then
 fi
 
 # Also kill anything lingering on our ports
-lsof -ti:8000 2>/dev/null | xargs kill 2>/dev/null || true
-lsof -ti:3000 2>/dev/null | xargs kill 2>/dev/null || true
-lsof -ti:8001 2>/dev/null | xargs kill 2>/dev/null || true
+for port in 8000 3000 8001 8102 8105; do
+    lsof -ti:$port 2>/dev/null | xargs kill 2>/dev/null || true
+done
 sleep 3  # Wait for ports to fully release
 
 # ── Start backend ────────────────────────────────────────────────────────────
@@ -96,6 +96,16 @@ ok "Backend starting (PID $!)"
 nohup linkedin-mcp-server --transport streamable-http --host 0.0.0.0 --port 8001 > /tmp/nester-linkedin-mcp.log 2>&1 &
 echo $! > /tmp/nester-linkedin-mcp.pid
 ok "LinkedIn MCP starting (PID $!) → port 8001"
+
+# ── Start MCP tool servers (search + web scraper) ────────────────────────────
+
+nohup python tools/servers/search.py > /tmp/nester-search-mcp.log 2>&1 &
+echo $! > /tmp/nester-search-mcp.pid
+ok "Search MCP starting (PID $!) → port 8105"
+
+nohup python tools/servers/web_scraper.py > /tmp/nester-scraper-mcp.log 2>&1 &
+echo $! > /tmp/nester-scraper-mcp.pid
+ok "Web Scraper MCP starting (PID $!) → port 8102"
 
 # ── Start frontend ───────────────────────────────────────────────────────────
 

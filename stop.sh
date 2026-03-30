@@ -52,28 +52,34 @@ if [ -f /tmp/nester-linkedin-mcp.pid ]; then
     rm -f /tmp/nester-linkedin-mcp.pid
 fi
 
+if [ -f /tmp/nester-search-mcp.pid ]; then
+    pid=$(cat /tmp/nester-search-mcp.pid)
+    if kill "$pid" 2>/dev/null; then
+        ok "Search MCP stopped (PID $pid)"
+        stopped=$((stopped + 1))
+    fi
+    rm -f /tmp/nester-search-mcp.pid
+fi
+
+if [ -f /tmp/nester-scraper-mcp.pid ]; then
+    pid=$(cat /tmp/nester-scraper-mcp.pid)
+    if kill "$pid" 2>/dev/null; then
+        ok "Web Scraper MCP stopped (PID $pid)"
+        stopped=$((stopped + 1))
+    fi
+    rm -f /tmp/nester-scraper-mcp.pid
+fi
+
 # ── Kill anything still on our ports ─────────────────────────────────────────
 
-backend_pids=$(lsof -ti:8000 2>/dev/null || true)
-if [ -n "$backend_pids" ]; then
-    echo "$backend_pids" | xargs kill 2>/dev/null || true
-    ok "Killed processes on port 8000"
-    stopped=$((stopped + 1))
-fi
-
-linkedin_pids=$(lsof -ti:8001 2>/dev/null || true)
-if [ -n "$linkedin_pids" ]; then
-    echo "$linkedin_pids" | xargs kill 2>/dev/null || true
-    ok "Killed processes on port 8001"
-    stopped=$((stopped + 1))
-fi
-
-frontend_pids=$(lsof -ti:3000 2>/dev/null || true)
-if [ -n "$frontend_pids" ]; then
-    echo "$frontend_pids" | xargs kill 2>/dev/null || true
-    ok "Killed processes on port 3000"
-    stopped=$((stopped + 1))
-fi
+for port in 8000 8001 8102 8105 3000; do
+    port_pids=$(lsof -ti:$port 2>/dev/null || true)
+    if [ -n "$port_pids" ]; then
+        echo "$port_pids" | xargs kill 2>/dev/null || true
+        ok "Killed processes on port $port"
+        stopped=$((stopped + 1))
+    fi
+done
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 
