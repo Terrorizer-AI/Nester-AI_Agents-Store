@@ -71,7 +71,7 @@ servers:
   - name: github_custom
     description: "Custom GitHub metrics — webhook queue, PR cycle time, commit velocity"
     transport: http
-    url: "http://localhost:8100"
+    url: "http://localhost:8100/mcp"
     tools_provided:
       - name: get_webhook_events
         description: "Retrieve recent webhook events from the Redis queue"
@@ -178,7 +178,7 @@ servers:
   - name: web_scraper
     description: "Website extraction via Firecrawl"
     transport: http
-    url: "http://localhost:8102"
+    url: "http://localhost:8102/mcp"
     tools_provided:
       - name: extract_website
         description: "Extract structured content from a website URL. Returns title, description, main content, links, and metadata."
@@ -209,7 +209,7 @@ servers:
   - name: slack
     description: "Slack Bot API — send alerts, messages"
     transport: http
-    url: "http://localhost:8103"
+    url: "http://localhost:8103/mcp"
     tools_provided:
       - name: send_message
         description: "Send a message to a Slack channel"
@@ -243,7 +243,7 @@ servers:
   - name: email
     description: "Email sending via SMTP"
     transport: http
-    url: "http://localhost:8104"
+    url: "http://localhost:8104/mcp"
     tools_provided:
       - name: send_email
         description: "Send an email via SMTP"
@@ -275,7 +275,7 @@ servers:
   - name: search
     description: "Web search via Tavily"
     transport: http
-    url: "http://localhost:8105"
+    url: "http://localhost:8105/mcp"
     tools_provided:
       - name: web_search
         description: "Search the web for information. Returns relevant results with titles, URLs, and content snippets."
