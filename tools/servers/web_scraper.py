@@ -11,12 +11,18 @@ Tools:
 
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import httpx
+from dotenv import load_dotenv
 from fastmcp import FastMCP
 
-mcp = FastMCP("web_scraper", description="Website extraction via Firecrawl")
+# Load .env from project root (needed when running as standalone server)
+_project_root = Path(__file__).resolve().parent.parent.parent
+load_dotenv(_project_root / ".env")
+
+mcp = FastMCP("web_scraper")
 
 FIRECRAWL_BASE = "https://api.firecrawl.dev/v1"
 

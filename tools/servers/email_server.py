@@ -14,7 +14,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-mcp = FastMCP("email", description="Email sending and validation via SMTP")
+mcp = FastMCP("email")
 
 
 @mcp.tool()

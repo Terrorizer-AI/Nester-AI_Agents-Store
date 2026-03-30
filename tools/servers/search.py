@@ -14,14 +14,20 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from fastmcp import FastMCP
 from tavily import TavilyClient
 
+# Load .env from project root (needed when running as standalone server)
+_project_root = Path(__file__).resolve().parent.parent.parent
+load_dotenv(_project_root / ".env")
+
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("search", description="Web search via Tavily")
+mcp = FastMCP("search")
 
 
 def _get_client() -> TavilyClient:

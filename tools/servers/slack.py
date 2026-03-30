@@ -14,7 +14,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-mcp = FastMCP("slack", description="Slack Bot API for alerts and messaging")
+mcp = FastMCP("slack")
 
 
 @mcp.tool()

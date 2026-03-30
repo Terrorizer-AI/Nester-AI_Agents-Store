@@ -16,7 +16,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-mcp = FastMCP("github_custom", description="Custom GitHub metrics and webhook queue")
+mcp = FastMCP("github_custom")
 
 
 @mcp.tool()
