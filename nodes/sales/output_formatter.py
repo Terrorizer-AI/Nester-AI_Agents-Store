@@ -22,6 +22,13 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = """You are a data extraction specialist. You receive raw research text from AI agents.
 Extract structured data and return ONLY valid JSON — no markdown, no explanation, no code fences.
 
+CRITICAL RULES:
+- Extract EVERY piece of data you find — do not summarize or shorten
+- For arrays (products, competitors, pain_points, growth_signals, etc.) include ALL items found, not just the first few
+- For text fields (mission, about, target_market) include the FULL text verbatim
+- Never truncate or omit data — completeness is the priority
+- If a field has data in the raw text, it must appear in the output
+
 Return exactly this structure (use null for missing fields, empty arrays [] for missing lists):
 
 {
@@ -122,7 +129,7 @@ def create_output_formatter(params: dict[str, Any]) -> Callable:
         llm = ChatOpenAI(
             model=model_config.model_id,
             temperature=0.0,
-            max_tokens=12000,
+            max_tokens=16000,
         )
 
         try:
@@ -155,7 +162,7 @@ def _get_raw(data: Any) -> str:
     if isinstance(data, dict):
         raw = data.get("raw_response", "")
         if raw and isinstance(raw, str):
-            return raw[:10000]  # cap per agent to stay within context
+            return raw[:15000]  # cap per agent to stay within context
         # If skipped
         if data.get("skipped"):
             return f"Skipped: {data.get('reason', 'no data')}"
@@ -172,6 +179,8 @@ async def _format_output(
 ) -> dict[str, Any]:
 
     user_message = f"""Extract structured data from these 4 research outputs.
+Be exhaustive — extract every product, competitor, growth signal, news item, hiring signal, and social proof item you find.
+Do NOT skip or truncate any arrays.
 
 ═══ LINKEDIN PROFILE (Agent 1) ═══
 {_get_raw(linkedin_data)}
@@ -185,7 +194,7 @@ async def _format_output(
 ═══ PROSPECT ACTIVITY (Agent 3) ═══
 {_get_raw(activity_data)}
 
-Return ONLY the JSON object. No explanation."""
+Return ONLY the JSON object. No explanation. Include ALL data found — do not truncate arrays."""
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},

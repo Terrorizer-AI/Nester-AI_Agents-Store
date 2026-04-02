@@ -31,10 +31,14 @@ mcp = FastMCP("search")
 
 
 def _get_client() -> TavilyClient:
-    """Get a Tavily client using the API key from environment."""
-    api_key = os.environ.get("TAVILY_API_KEY", "")
+    """Get a Tavily client — checks SQLite (user-set) then .env."""
+    try:
+        from config.keys import get_api_key
+        api_key = get_api_key("TAVILY_API_KEY")
+    except Exception:
+        api_key = os.environ.get("TAVILY_API_KEY", "")
     if not api_key or api_key == "your_tavily_key":
-        raise ValueError("TAVILY_API_KEY not configured — set it in .env")
+        raise ValueError("TAVILY_API_KEY not configured — set it in Settings or .env")
     return TavilyClient(api_key=api_key)
 
 

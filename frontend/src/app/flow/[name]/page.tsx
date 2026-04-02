@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import EmailPreview from "@/components/EmailPreview";
 import PersonaCard from "@/components/PersonaCard";
 import AnalysisPanel from "@/components/AnalysisPanel";
 import CompanyDashboard from "@/components/CompanyDashboard";
+import ConfirmModal from "@/components/ConfirmModal";
 import ResearchChatDrawer from "@/components/ResearchChatDrawer";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -87,6 +88,27 @@ function makeProspect(overrides: Partial<ProspectRow> = {}): ProspectRow {
   };
 }
 
+// ── Session persistence (prospects queue survives navigation) ─────────────────
+
+const SESSION_KEY = "nester_prospects_session";
+
+function loadSession(): { prospects: ProspectRow[]; selectedId: string } | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Reset any running state to idle — they won't resume
+    const prospects = (parsed.prospects as ProspectRow[]).map(p =>
+      p.status === "running" ? { ...p, status: "idle" as const, agents: PIPELINE_STAGES.map(a => ({ ...a })) } : p
+    );
+    return { prospects, selectedId: parsed.selectedId || "" };
+  } catch { return null; }
+}
+
+function saveSession(prospects: ProspectRow[], selectedId: string): void {
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ prospects, selectedId })); } catch { /* noop */ }
+}
+
 // ── Profile persistence ───────────────────────────────────────────────────────
 
 function loadSavedProfile(): SenderProfile | null {
@@ -114,41 +136,41 @@ function AgentNode({ step, index }: { step: AgentStep; index: number }) {
   const isFailed = step.status === "failed";
 
   return (
-    <div className="flex flex-col items-center gap-1.5 group/node relative px-3">
+    <div className="flex flex-col items-center gap-2 group/node relative px-4">
       {/* Node orb */}
       <div className={`relative flex items-center justify-center rounded-full border transition-all duration-500 ${
         isDone
-          ? "w-8 h-8 bg-secondary border-secondary/30 shadow-[0_0_12px_rgba(78,222,163,0.5)]"
+          ? "w-12 h-12 bg-secondary border-secondary/30 shadow-[0_0_18px_rgba(34,197,94,0.5)]"
           : isRunning
-          ? "w-9 h-9 bg-accent border-accent/50 shadow-[0_0_18px_rgba(128,131,255,0.6)] animate-pulse"
+          ? "w-14 h-14 bg-accent border-accent/50 shadow-[0_0_24px_rgba(239,49,57,0.6)] animate-pulse"
           : isFailed
-          ? "w-8 h-8 bg-error/20 border-error/40"
-          : "w-8 h-8 bg-surface-high border-outline/20"
+          ? "w-12 h-12 bg-error/20 border-error/40"
+          : "w-12 h-12 bg-surface-high border-outline/20"
       }`}>
         {isDone ? (
-          <svg className="w-3.5 h-3.5 text-background" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <svg className="w-5 h-5 text-background" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         ) : isRunning ? (
-          <svg className="w-3.5 h-3.5 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-white animate-spin" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
           </svg>
         ) : isFailed ? (
-          <span className="text-error text-[10px] font-black">✕</span>
+          <span className="text-error text-sm font-black">✕</span>
         ) : (
-          <span className={`text-[10px] font-black ${isDone ? "text-background" : "text-muted/50"}`}>{index + 1}</span>
+          <span className={`text-xs font-black ${isDone ? "text-background" : "text-muted/50"}`}>{index + 1}</span>
         )}
       </div>
 
       {/* Label */}
       <div className="text-center min-w-0">
-        <span className={`block text-[0.5rem] uppercase tracking-wider font-bold whitespace-nowrap ${
+        <span className={`block text-[0.65rem] uppercase tracking-wider font-bold whitespace-nowrap ${
           isDone ? "text-secondary" : isRunning ? "text-accent" : "text-muted/40"
         }`}>
           {step.label}
         </span>
-        <span className={`block text-[0.42rem] font-mono mt-0.5 ${
+        <span className={`block text-[0.55rem] font-mono mt-0.5 ${
           isDone ? "text-secondary/50" : isRunning ? "text-accent/60 animate-pulse" : "text-muted/25"
         }`}>
           {isDone && step.durationMs ? `${(step.durationMs/1000).toFixed(1)}s` : isRunning ? "RUNNING" : "STANDBY"}
@@ -168,11 +190,11 @@ function AgentNode({ step, index }: { step: AgentStep; index: number }) {
 
 function Wire({ active }: { active: boolean }) {
   return (
-    <div className={`h-px w-5 flex-shrink-0 transition-all duration-500 self-start mt-4 ${
+    <div className={`h-px w-8 flex-shrink-0 transition-all duration-500 self-start mt-6 ${
       active ? "bg-secondary/70" : ""
     }`}
       style={active ? {} : {
-        backgroundImage: "repeating-linear-gradient(90deg,#464554 0,#464554 3px,transparent 3px,transparent 7px)"
+        backgroundImage: "repeating-linear-gradient(90deg,#27272a 0,#27272a 3px,transparent 3px,transparent 7px)"
       }}
     />
   );
@@ -268,8 +290,8 @@ function VArrow({ active, label }: { active: boolean; label?: string }) {
 
 function HArrow({ active }: { active: boolean }) {
   return (
-    <svg width="32" height="8" viewBox="0 0 32 8" className={`flex-shrink-0 transition-colors duration-500 ${active ? "text-secondary/60" : "text-outline/20"}`}>
-      <path d="M0 4 L26 4 M22 0 L26 4 L22 8" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg width="48" height="12" viewBox="0 0 48 12" className={`flex-shrink-0 transition-colors duration-500 ${active ? "text-secondary/60" : "text-outline/20"}`}>
+      <path d="M0 6 L40 6 M34 1 L40 6 L34 11" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
@@ -296,28 +318,28 @@ function MiniNode({ step, index, label, sub }: { step: AgentStep; index: number;
   const isRunning = step.status === "running";
 
   return (
-    <div className={`relative rounded-lg border px-2.5 py-2 shrink-0 transition-all duration-500 ${
-      isDone    ? "border-secondary/40 bg-secondary/5 shadow-[0_0_10px_rgba(78,222,163,0.12)]"
-      : isRunning ? "border-accent/50 bg-accent/5 shadow-[0_0_12px_rgba(128,131,255,0.2)] animate-pulse"
+    <div className={`relative rounded-xl border px-4 py-3 shrink-0 transition-all duration-500 ${
+      isDone    ? "border-secondary/40 bg-secondary/5 shadow-[0_0_14px_rgba(34,197,94,0.15)]"
+      : isRunning ? "border-accent/50 bg-accent/5 shadow-[0_0_18px_rgba(239,49,57,0.25)] animate-pulse"
       : "border-outline/20 bg-card/50"
-    }`} style={{ minWidth: "68px" }}>
+    }`} style={{ minWidth: "100px" }}>
       {/* index */}
-      <div className="absolute -top-2 -left-2 w-4 h-4 rounded-full bg-surface-high border border-outline/30 flex items-center justify-center">
-        <span className="text-[0.38rem] font-black text-muted">{index}</span>
+      <div className="absolute -top-2.5 -left-2.5 w-5 h-5 rounded-full bg-surface-high border border-outline/30 flex items-center justify-center">
+        <span className="text-[0.5rem] font-black text-muted">{index}</span>
       </div>
       {/* status dot */}
-      <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full border border-background ${
+      <div className={`absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full border-2 border-background ${
         isDone ? "bg-secondary" : isRunning ? "bg-accent animate-pulse" : "bg-outline/30"
       }`} />
-      <div className={`text-[0.5rem] font-black uppercase tracking-wide truncate ${
+      <div className={`text-[0.65rem] font-black uppercase tracking-wide truncate ${
         isDone ? "text-secondary" : isRunning ? "text-accent" : "text-muted/50"
       }`}>{label}</div>
-      <div className="text-[0.38rem] text-muted/40 truncate">{sub}</div>
+      <div className="text-[0.55rem] text-muted/40 truncate mt-0.5">{sub}</div>
       {isDone && step.durationMs ? (
-        <div className="text-[0.38rem] font-mono text-secondary/50 mt-0.5">✓ {(step.durationMs/1000).toFixed(1)}s</div>
+        <div className="text-[0.55rem] font-mono text-secondary/50 mt-1">✓ {(step.durationMs/1000).toFixed(1)}s</div>
       ) : isRunning ? (
-        <div className="flex gap-0.5 mt-0.5">
-          {[0,150,300].map(d => <span key={d} className="w-0.5 h-0.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: `${d}ms` }} />)}
+        <div className="flex gap-1 mt-1">
+          {[0,150,300].map(d => <span key={d} className="w-1 h-1 rounded-full bg-accent animate-bounce" style={{ animationDelay: `${d}ms` }} />)}
         </div>
       ) : null}
     </div>
@@ -327,7 +349,7 @@ function MiniNode({ step, index, label, sub }: { step: AgentStep; index: number;
 // ── Parallel fork / join SVGs ─────────────────────────────────────────────────
 
 function ParallelFork({ active }: { active: boolean }) {
-  const c = active ? "#4edea3" : "rgba(70,69,84,0.25)";
+  const c = active ? "#22c55e" : "rgba(39,39,42,0.25)";
   // From 1 point on left → split to 3 rows (top/mid/bot) on right
   return (
     <svg width="20" height="90" viewBox="0 0 20 90" className="transition-all duration-500 shrink-0">
@@ -341,7 +363,7 @@ function ParallelFork({ active }: { active: boolean }) {
 }
 
 function ParallelJoin({ active }: { active: boolean }) {
-  const c = active ? "#4edea3" : "rgba(70,69,84,0.25)";
+  const c = active ? "#22c55e" : "rgba(39,39,42,0.25)";
   return (
     <svg width="20" height="90" viewBox="0 0 20 90" className="transition-all duration-500 shrink-0">
       <line x1="0" y1="15" x2="10" y2="15" stroke={c} strokeWidth="1.5"/>
@@ -356,7 +378,7 @@ function ParallelJoin({ active }: { active: boolean }) {
 // ── Fan-out / fan-in for parallel block ───────────────────────────────────────
 
 function FanOut({ active }: { active: boolean }) {
-  const c = active ? "#4edea3" : "rgba(70,69,84,0.3)";
+  const c = active ? "#22c55e" : "rgba(39,39,42,0.3)";
   return (
     <svg width="200" height="28" viewBox="0 0 200 28" className="transition-all duration-500">
       {/* Vertical stem down */}
@@ -372,7 +394,7 @@ function FanOut({ active }: { active: boolean }) {
 }
 
 function FanIn({ active }: { active: boolean }) {
-  const c = active ? "#4edea3" : "rgba(70,69,84,0.3)";
+  const c = active ? "#22c55e" : "rgba(39,39,42,0.3)";
   return (
     <svg width="200" height="28" viewBox="0 0 200 28" className="transition-all duration-500">
       {/* Three rises */}
@@ -411,30 +433,30 @@ function PipelineTimeline({ steps, fullscreen = false }: { steps: AgentStep[]; f
 
   if (fullscreen) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center px-6 py-4 gap-4">
+      <div className="w-full h-full flex flex-col items-center justify-center px-8 py-6 gap-6">
 
         {/* ── Header ── */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-4 shrink-0">
           <div>
-            <h2 className="text-xs font-black uppercase tracking-widest text-foreground">Sales Outreach Pipeline</h2>
-            <p className="text-[0.48rem] text-muted/50 uppercase tracking-widest">8-Agent Architecture · AI-Driven Personalization</p>
+            <h2 className="text-sm font-black uppercase tracking-widest text-foreground">Sales Outreach Pipeline</h2>
+            <p className="text-[0.6rem] text-muted/50 uppercase tracking-widest">8-Agent Architecture · AI-Driven Personalization</p>
           </div>
           {isRunning && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/10 border border-accent/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              <span className="text-[0.45rem] font-bold uppercase tracking-widest text-accent">Live · {completedCount}/{steps.length}</span>
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent/10 border border-accent/20">
+              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+              <span className="text-[0.55rem] font-bold uppercase tracking-widest text-accent">Live · {completedCount}/{steps.length}</span>
             </span>
           )}
           {isComplete && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary/10 border border-secondary/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-              <span className="text-[0.45rem] font-bold uppercase tracking-widest text-secondary">Complete · {(totalMs/1000).toFixed(1)}s</span>
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/10 border border-secondary/20">
+              <span className="w-2 h-2 rounded-full bg-secondary" />
+              <span className="text-[0.55rem] font-bold uppercase tracking-widest text-secondary">Complete · {(totalMs/1000).toFixed(1)}s</span>
             </span>
           )}
           {!isRunning && !isComplete && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-high border border-outline/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-muted/30" />
-              <span className="text-[0.45rem] font-bold uppercase tracking-widest text-muted/40">Ready</span>
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-high border border-outline/20">
+              <span className="w-2 h-2 rounded-full bg-muted/30" />
+              <span className="text-[0.55rem] font-bold uppercase tracking-widest text-muted/40">Ready</span>
             </span>
           )}
         </div>
@@ -443,9 +465,9 @@ function PipelineTimeline({ steps, fullscreen = false }: { steps: AgentStep[]; f
         <div className="flex items-center justify-center gap-0 shrink-0 w-full">
 
           {/* Input bubble */}
-          <div className="rounded-lg border border-dashed border-outline/20 bg-surface-low/30 px-2 py-1.5 text-center shrink-0">
-            <div className="text-[0.38rem] font-bold uppercase tracking-widest text-muted/40 mb-0.5">Input</div>
-            <div className="text-[0.38rem] text-muted/40 leading-relaxed">
+          <div className="rounded-xl border border-dashed border-outline/20 bg-surface-low/30 px-4 py-3 text-center shrink-0">
+            <div className="text-[0.55rem] font-bold uppercase tracking-widest text-muted/40 mb-1">Input</div>
+            <div className="text-[0.55rem] text-muted/40 leading-relaxed">
               <div>LinkedIn</div><div>Company</div><div>Seller</div>
             </div>
           </div>
@@ -456,13 +478,13 @@ function PipelineTimeline({ steps, fullscreen = false }: { steps: AgentStep[]; f
           {linkedin && <MiniNode step={linkedin} index={1} label="LinkedIn" sub="Profile + Posts" />}
 
           {/* Parallel fork */}
-          <div className="flex flex-col items-center shrink-0 mx-1">
+          <div className="flex flex-col items-center shrink-0 mx-2">
             <ParallelFork active={linkedinDone} />
           </div>
 
           {/* Stage 2 — stacked parallel */}
-          <div className="flex flex-col gap-1.5 shrink-0">
-            <div className="text-[0.38rem] font-bold uppercase tracking-widest text-accent/40 text-center mb-0.5">∥ parallel</div>
+          <div className="flex flex-col gap-2 shrink-0">
+            <div className="text-[0.55rem] font-bold uppercase tracking-widest text-accent/40 text-center mb-0.5">∥ parallel</div>
             {company    && <MiniNode step={company}    index={2} label="Company"    sub="Website scrape" />}
             {coLinkedin && <MiniNode step={coLinkedin} index={3} label="Co.LinkedIn" sub="Team + posts" />}
             {activity   && <MiniNode step={activity}   index={4} label="User LI"    sub="Posts + DNA" />}
@@ -491,11 +513,11 @@ function PipelineTimeline({ steps, fullscreen = false }: { steps: AgentStep[]; f
           <HArrow active={isComplete} />
 
           {/* Output bubble */}
-          <div className={`rounded-lg border px-2 py-1.5 text-center shrink-0 transition-all duration-500 ${
+          <div className={`rounded-xl border px-4 py-3 text-center shrink-0 transition-all duration-500 ${
             isComplete ? "border-secondary/30 bg-secondary/5" : "border-dashed border-outline/20 bg-surface-low/30"
           }`}>
-            <div className={`text-[0.38rem] font-bold uppercase tracking-widest mb-0.5 ${isComplete ? "text-secondary/60" : "text-muted/40"}`}>Output</div>
-            <div className="text-[0.38rem] text-muted/40 leading-relaxed">
+            <div className={`text-[0.55rem] font-bold uppercase tracking-widest mb-1 ${isComplete ? "text-secondary/60" : "text-muted/40"}`}>Output</div>
+            <div className="text-[0.55rem] text-muted/40 leading-relaxed">
               <div>Emails</div><div>Persona</div><div>Intel</div>
             </div>
           </div>
@@ -503,12 +525,12 @@ function PipelineTimeline({ steps, fullscreen = false }: { steps: AgentStep[]; f
         </div>
 
         {/* Progress bar */}
-        <div className="w-full max-w-xl shrink-0 flex flex-col gap-1">
-          <div className="flex justify-between text-[0.45rem] font-mono text-muted/40">
+        <div className="w-full max-w-2xl shrink-0 flex flex-col gap-1.5">
+          <div className="flex justify-between text-[0.6rem] font-mono text-muted/40">
             <span>{completedCount}/{steps.length} agents</span>
             <span>{Math.round(progress)}%</span>
           </div>
-          <div className="h-1 bg-outline/10 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-outline/10 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-accent to-secondary rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
           </div>
         </div>
@@ -557,14 +579,14 @@ function PipelineTimeline({ steps, fullscreen = false }: { steps: AgentStep[]; f
 
       {/* Timeline — single horizontal row */}
       <div className="flex items-start justify-center overflow-x-auto">
-        <div className="flex flex-col items-center" style={{ paddingTop: "13px" }}>
+        <div className="flex flex-col items-center" style={{ paddingTop: "16px" }}>
           {linkedin && <AgentNode step={linkedin} index={0} />}
         </div>
         <Wire active={linkedinDone2} />
 
         <div className="flex flex-col items-center">
-          <span className="text-[0.38rem] uppercase tracking-widest text-accent/30 font-bold mb-1 h-3 flex items-center">∥ parallel</span>
-          <div className="flex items-start border border-accent/15 rounded-xl bg-surface-low/30 px-1 py-1">
+          <span className="text-[0.55rem] uppercase tracking-widest text-accent/30 font-bold mb-1 h-4 flex items-center">∥ parallel</span>
+          <div className="flex items-start border border-accent/15 rounded-xl bg-surface-low/30 px-2 py-2">
             {[company, coLinkedin, activity].map((step, i) => step && (
               <div key={step.id} className="flex items-start">
                 <AgentNode step={step} index={i + 1} />
@@ -583,7 +605,7 @@ function PipelineTimeline({ steps, fullscreen = false }: { steps: AgentStep[]; f
           { step: formatter, idx: 7, active: false },
         ].map(({ step, idx, active }, pos) => step && (
           <div key={step.id} className="flex items-start">
-            <div style={{ paddingTop: "13px" }}>
+            <div style={{ paddingTop: "16px" }}>
               <AgentNode step={step} index={idx} />
             </div>
             {pos < 3 && <Wire active={active} />}
@@ -608,12 +630,12 @@ function MatchDial({ score }: { score: number }) {
   const r = 36;
   const circ = 2 * Math.PI * r;
   const offset = circ - (score / 100) * circ;
-  const color = score >= 70 ? "#4edea3" : score >= 50 ? "#8083ff" : "#ffb95f";
+  const color = score >= 70 ? "#22c55e" : score >= 50 ? "#ef3139" : "#f97316";
 
   return (
     <div className="relative w-24 h-24 flex items-center justify-center">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
-        <circle cx="40" cy="40" r={r} fill="transparent" stroke="#2a292f" strokeWidth="6" />
+        <circle cx="40" cy="40" r={r} fill="transparent" stroke="#1a1a1a" strokeWidth="6" />
         <circle
           cx="40" cy="40" r={r} fill="transparent"
           stroke={color} strokeWidth="6"
@@ -668,12 +690,19 @@ function OutputCanvas({
 }) {
   const [tab, setTab] = useState<Tab>("email");
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "email",        label: "Generated Variants" },
-    { key: "persona",      label: "Persona" },
-    { key: "intelligence", label: "Intelligence" },
-    { key: "company",      label: "Company Research" },
-    { key: "raw",          label: "Raw" },
+  // Auto-switch to company tab when pipeline first completes
+  const prevOutput = useRef<typeof output>(null);
+  useEffect(() => {
+    if (output && !prevOutput.current) setTab("company");
+    prevOutput.current = output;
+  }, [output]);
+
+  const tabs: { key: Tab; label: string; icon: string }[] = [
+    { key: "email",        label: "Emails",           icon: "✉" },
+    { key: "company",      label: "Company Research",  icon: "🏢" },
+    { key: "persona",      label: "Persona",           icon: "🧠" },
+    { key: "intelligence", label: "Intelligence",      icon: "🔍" },
+    { key: "raw",          label: "Raw",               icon: "{ }" },
   ];
 
   if (!output && !running) {
@@ -739,13 +768,19 @@ function OutputCanvas({
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-[0.6875rem] font-bold uppercase tracking-widest border-b-2 transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-[0.6875rem] font-bold uppercase tracking-widest border-b-2 transition-all ${
               tab === t.key
                 ? "border-accent text-accent-dim"
+                : t.key === "company" && output
+                ? "border-transparent text-secondary/80 hover:text-secondary"
                 : "border-transparent text-muted hover:text-foreground"
             }`}
           >
-            {t.label}
+            <span>{t.icon}</span>
+            <span>{t.label}</span>
+            {t.key === "company" && output && tab !== "company" && (
+              <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+            )}
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2 pb-1">
@@ -884,20 +919,28 @@ export default function FlowPage() {
 
   // ── Prospect queue ────────────────────────────────────────────────────────
   const [prospects, setProspects] = useState<ProspectRow[]>([makeProspect()]);
-  const [selectedId, setSelectedId] = useState<string>(() => "");
+  const [selectedId, setSelectedId] = useState<string>("");
   const [runAllActive, setRunAllActive] = useState(false);
 
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [pipelineCollapsed, setPipelineCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Abort controllers keyed by prospect ID — used to cancel running pipelines
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+
   // Knowledge panel state
   const [knowledgeDocCount, setKnowledgeDocCount] = useState(0);
+  const [knowledgeChunkCount, setKnowledgeChunkCount] = useState(0);
+  const [knowledgeLastSync, setKnowledgeLastSync] = useState<string | null>(null);
   const [knowledgeDocs, setKnowledgeDocs] = useState<{ file_id: string; file_name: string; mime_type: string; chunk_count: number }[]>([]);
   const [knowledgeSyncing, setKnowledgeSyncing] = useState(false);
+  const [knowledgeProcessing, setKnowledgeProcessing] = useState<string[]>([]); // file names being processed
   const [knowledgeDeletingId, setKnowledgeDeletingId] = useState<string | null>(null);
+  const [knowledgeConfirmDelete, setKnowledgeConfirmDelete] = useState<{ file_id: string; file_name: string; chunk_count: number } | null>(null);
   const [knowledgeMsg, setKnowledgeMsg] = useState("");
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const knowledgePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load saved profile on mount
   useEffect(() => {
@@ -911,25 +954,23 @@ export default function FlowPage() {
     setProfileLoaded(true);
   }, []);
 
-  // Select first prospect by default once mounted
+  // Restore session from sessionStorage after mount (avoids SSR hydration mismatch)
   useEffect(() => {
-    setSelectedId(prev => prev || prospects[0]?.id || "");
+    const session = loadSession();
+    if (session?.prospects?.length) {
+      setProspects(session.prospects);
+      setSelectedId(session.selectedId || session.prospects[0]?.id || "");
+    } else {
+      setSelectedId(prev => prev || prospects[0]?.id || "");
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const refreshKnowledge = useCallback(() => {
-    fetch(`${API}/knowledge/status`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setKnowledgeDocCount(d.doc_count || 0); })
-      .catch(() => {});
-    fetch(`${API}/knowledge/docs`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setKnowledgeDocs(d.docs || []); })
-      .catch(() => {});
-  }, []);
+  // Auto-save prospect queue to sessionStorage on every change
+  useEffect(() => {
+    if (prospects.length > 0) saveSession(prospects, selectedId);
+  }, [prospects, selectedId]);
 
-  // Load knowledge status + docs on mount
-  useEffect(() => { refreshKnowledge(); }, [refreshKnowledge]);
 
   const updateSender = (field: keyof SenderProfile, value: string) =>
     setSenderForm(prev => ({ ...prev, [field]: value }));
@@ -988,11 +1029,45 @@ export default function FlowPage() {
 
   const selectedProspect = prospects.find(p => p.id === selectedId) || prospects[0] || null;
 
+  const refreshKnowledge = useCallback(() => {
+    fetch(`${API}/knowledge/status`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) {
+          setKnowledgeDocCount(d.doc_count || 0);
+          setKnowledgeChunkCount(d.chunk_count || 0);
+          setKnowledgeLastSync(d.last_sync || null);
+        }
+      })
+      .catch(() => {});
+    fetch(`${API}/knowledge/docs`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setKnowledgeDocs(d.docs || []); })
+      .catch(() => {});
+  }, []);
+
+  // Load knowledge status + docs on mount; auto-open section if docs exist
+  useEffect(() => {
+    Promise.all([
+      fetch(`${API}/knowledge/status`).then(r => r.ok ? r.json() : null),
+      fetch(`${API}/knowledge/docs`).then(r => r.ok ? r.json() : null),
+    ]).then(([status, docs]) => {
+      if (status) {
+        setKnowledgeDocCount(status.doc_count || 0);
+        setKnowledgeChunkCount(status.chunk_count || 0);
+        setKnowledgeLastSync(status.last_sync || null);
+      }
+      const docList = docs?.docs || [];
+      setKnowledgeDocs(docList);
+      if (docList.length > 0) setKnowledgeOpen(true);
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const openKnowledgePicker = useCallback(async () => {
     setKnowledgeSyncing(true);
     setKnowledgeMsg("Loading Google APIs...");
     try {
-      // Load Google Identity and Picker scripts
       await Promise.all([
         new Promise<void>(resolve => {
           if ((window as any).google?.accounts) { resolve(); return; }
@@ -1010,7 +1085,6 @@ export default function FlowPage() {
         }),
       ]);
 
-      // Get status for client_id
       const statusRes = await fetch(`${API}/knowledge/status`);
       const statusData = statusRes.ok ? await statusRes.json() : {};
       const clientId = statusData.google_client_id || "";
@@ -1041,7 +1115,8 @@ export default function FlowPage() {
                   return;
                 }
                 const files = data.docs.map((d: any) => ({ id: d.id, name: d.name, mimeType: d.mimeType }));
-                setKnowledgeMsg(`Syncing ${files.length} file(s)...`);
+                setKnowledgeProcessing(files.map((f: any) => f.name));
+                setKnowledgeMsg("");
                 try {
                   const res = await fetch(`${API}/knowledge/files`, {
                     method: "POST",
@@ -1049,16 +1124,44 @@ export default function FlowPage() {
                     body: JSON.stringify({ files, access_token: accessToken }),
                   });
                   if (res.ok) {
-                    setKnowledgeMsg(`✓ Syncing ${files.length} file(s) in background`);
-                    setTimeout(() => {
-                      refreshKnowledge();
-                      setKnowledgeMsg("");
-                    }, 8000);
+                    // Poll every 2s until chunk count increases or 60s timeout
+                    const startChunks = knowledgeChunkCount;
+                    let elapsed = 0;
+                    if (knowledgePollRef.current) clearInterval(knowledgePollRef.current);
+                    knowledgePollRef.current = setInterval(async () => {
+                      elapsed += 2000;
+                      try {
+                        const [statusRes, docsRes] = await Promise.all([
+                          fetch(`${API}/knowledge/status`).then(r => r.ok ? r.json() : null),
+                          fetch(`${API}/knowledge/docs`).then(r => r.ok ? r.json() : null),
+                        ]);
+                        if (statusRes) {
+                          setKnowledgeDocCount(statusRes.doc_count || 0);
+                          setKnowledgeChunkCount(statusRes.chunk_count || 0);
+                          setKnowledgeLastSync(statusRes.last_sync || null);
+                        }
+                        if (docsRes) setKnowledgeDocs(docsRes.docs || []);
+                        const done = (statusRes?.chunk_count || 0) > startChunks || elapsed >= 60000;
+                        if (done) {
+                          clearInterval(knowledgePollRef.current!);
+                          knowledgePollRef.current = null;
+                          setKnowledgeProcessing([]);
+                          setKnowledgeSyncing(false);
+                          setKnowledgeMsg("✓ Indexed successfully");
+                          setTimeout(() => setKnowledgeMsg(""), 3000);
+                        }
+                      } catch {}
+                    }, 2000);
                   } else {
                     setKnowledgeMsg("Sync failed — check backend logs");
+                    setKnowledgeProcessing([]);
+                    setKnowledgeSyncing(false);
                   }
-                } catch { setKnowledgeMsg("Network error"); }
-                setKnowledgeSyncing(false);
+                } catch {
+                  setKnowledgeMsg("Network error");
+                  setKnowledgeProcessing([]);
+                  setKnowledgeSyncing(false);
+                }
               })
               .build();
             picker.setVisible(true);
@@ -1071,6 +1174,15 @@ export default function FlowPage() {
       setKnowledgeSyncing(false);
     }
   }, [refreshKnowledge]);
+
+  // ── Stop a running prospect ───────────────────────────────────────────────
+  const stopProspect = useCallback((prospectId: string) => {
+    const controller = abortControllersRef.current.get(prospectId);
+    if (controller) {
+      controller.abort();
+      abortControllersRef.current.delete(prospectId);
+    }
+  }, []);
 
   // ── Run a single prospect ─────────────────────────────────────────────────
   const runProspect = useCallback(async (prospectId: string) => {
@@ -1087,7 +1199,11 @@ export default function FlowPage() {
       : p
     ));
     setSelectedId(prospectId);
-    setPipelineCollapsed(false);
+    setPipelineCollapsed(false); // always show full-screen pipeline when starting
+
+    // Create abort controller for this run
+    const controller = new AbortController();
+    abortControllersRef.current.set(prospectId, controller);
 
     // Animate pipeline stages for this prospect
     const stageCount = PIPELINE_STAGES.length;
@@ -1126,9 +1242,11 @@ export default function FlowPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
+        signal: controller.signal,
       });
       const data = await res.json();
       timers.forEach(clearTimeout);
+      abortControllersRef.current.delete(prospectId);
       setProspects(prev => prev.map(p => p.id !== prospectId ? p : {
         ...p,
         status: "completed",
@@ -1136,14 +1254,24 @@ export default function FlowPage() {
         duration_ms: data.duration_ms || null,
         agents: p.agents.map(a => ({ ...a, status: "completed" as const, durationMs: (data.duration_ms || 60000) / p.agents.length })),
       }));
-      setTimeout(() => setPipelineCollapsed(true), 1800);
-    } catch {
+      setTimeout(() => setPipelineCollapsed(true), 2500);
+    } catch (err: any) {
       timers.forEach(clearTimeout);
-      setProspects(prev => prev.map(p => p.id !== prospectId ? p : {
-        ...p,
-        status: "failed",
-        agents: p.agents.map(a => a.status === "running" ? { ...a, status: "failed" as const } : a),
-      }));
+      abortControllersRef.current.delete(prospectId);
+      // If aborted by user — reset to idle cleanly
+      if (err?.name === "AbortError") {
+        setProspects(prev => prev.map(p => p.id !== prospectId ? p : {
+          ...p,
+          status: "idle",
+          agents: PIPELINE_STAGES.map(a => ({ ...a })),
+        }));
+      } else {
+        setProspects(prev => prev.map(p => p.id !== prospectId ? p : {
+          ...p,
+          status: "failed",
+          agents: p.agents.map(a => a.status === "running" ? { ...a, status: "failed" as const } : a),
+        }));
+      }
     }
   }, [prospects, senderForm, serviceTags, isSales, name]);
 
@@ -1179,7 +1307,6 @@ export default function FlowPage() {
     setRunAllActive(false);
   }, [prospects, runAllActive, runProspect]);
 
-  // Only name + company are required — value prop/services come from docs if synced
   const hasKnowledgeDocs = knowledgeDocCount > 0;
   const profileIsComplete = Boolean(senderForm.sender_name && senderForm.sender_company);
 
@@ -1311,7 +1438,16 @@ export default function FlowPage() {
                             ▶
                           </button>
                         )}
-                        {prospects.length > 1 && (
+                        {prospect.status === "running" && (
+                          <button
+                            onClick={e => { e.stopPropagation(); stopProspect(prospect.id); }}
+                            className="text-[0.5rem] px-1.5 py-0.5 rounded bg-error/20 text-error hover:bg-error/30 transition-colors font-bold"
+                            title="Stop this pipeline"
+                          >
+                            ■ Stop
+                          </button>
+                        )}
+                        {prospects.length > 1 && prospect.status !== "running" && (
                           <button
                             onClick={e => { e.stopPropagation(); removeProspect(prospect.id); }}
                             className="text-[0.5rem] px-1.5 py-0.5 rounded bg-error/10 text-error/70 hover:bg-error/20 transition-colors font-bold"
@@ -1434,8 +1570,6 @@ export default function FlowPage() {
                     </span>
                   )}
                 </div>
-
-                {/* If docs synced — just show tone/CTA, brief note */}
                 {hasKnowledgeDocs ? (
                   <div className="space-y-3">
                     <div className="rounded-lg bg-secondary/5 border border-secondary/15 px-3 py-2.5">
@@ -1529,99 +1663,22 @@ export default function FlowPage() {
           )}
         </div>
 
-        {/* ── Company Knowledge ────────────────────────────────────────────── */}
+        {/* Knowledge link */}
         <div className="px-8 pb-4">
-          <div className="border border-outline/15 rounded-xl overflow-hidden bg-card/40">
-            {/* Header row — always visible, toggles collapse */}
-            <button
-              onClick={() => setKnowledgeOpen(o => !o)}
-              className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-high/30 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <svg className="w-3.5 h-3.5 text-accent/70 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span className="text-[0.6rem] font-bold uppercase tracking-widest text-muted">Company Knowledge</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {knowledgeDocCount > 0 && (
-                  <span className="text-[0.5rem] font-bold px-1.5 py-0.5 rounded-full bg-secondary/15 text-secondary">{knowledgeDocCount} docs</span>
-                )}
-                <svg className={`w-3 h-3 text-muted/40 transition-transform duration-200 ${knowledgeOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </button>
-
-            {/* Collapsible body */}
-            {knowledgeOpen && (
-              <div className="border-t border-outline/10">
-
-                {/* File list */}
-                {knowledgeDocs.length > 0 && (
-                  <div className="px-4 pt-3 space-y-1.5">
-                    {knowledgeDocs.map(doc => {
-                      const icon = doc.mime_type.includes("pdf") ? "📕"
-                        : doc.mime_type.includes("presentation") || doc.mime_type.includes("slide") ? "📊"
-                        : doc.mime_type.includes("spreadsheet") || doc.mime_type.includes("sheet") ? "📋"
-                        : "📄";
-                      return (
-                        <div key={doc.file_id} className="flex items-center gap-2 group/kfile rounded-lg px-2 py-1.5 hover:bg-surface-high/30 transition-colors">
-                          <span className="text-[0.65rem] flex-shrink-0">{icon}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[0.55rem] font-medium text-foreground/80 truncate">{doc.file_name}</p>
-                            <p className="text-[0.45rem] text-muted/40">{doc.chunk_count} chunks</p>
-                          </div>
-                          <button
-                            onClick={async () => {
-                              if (!confirm(`Remove "${doc.file_name}"?`)) return;
-                              setKnowledgeDeletingId(doc.file_id);
-                              try {
-                                const res = await fetch(`${API}/knowledge/files/${doc.file_id}`, { method: "DELETE" });
-                                if (res.ok) {
-                                  setKnowledgeDocs(prev => prev.filter(d => d.file_id !== doc.file_id));
-                                  setKnowledgeDocCount(prev => Math.max(0, prev - 1));
-                                }
-                              } catch {}
-                              setKnowledgeDeletingId(null);
-                            }}
-                            disabled={knowledgeDeletingId === doc.file_id}
-                            className="flex-shrink-0 opacity-0 group-hover/kfile:opacity-100 transition-opacity w-5 h-5 flex items-center justify-center rounded text-error/50 hover:text-error hover:bg-error/10 text-[0.6rem] font-bold disabled:opacity-30"
-                            title="Remove file"
-                          >
-                            {knowledgeDeletingId === doc.file_id ? "…" : "✕"}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Empty state */}
-                {knowledgeDocs.length === 0 && !knowledgeSyncing && (
-                  <p className="text-[0.55rem] text-muted/40 italic text-center py-3 px-4">
-                    No docs synced yet
-                  </p>
-                )}
-
-                {/* Add / status */}
-                <div className="px-4 pb-4 pt-3">
-                  <button
-                    onClick={openKnowledgePicker}
-                    disabled={knowledgeSyncing}
-                    className="w-full py-2 rounded-lg text-[0.625rem] font-bold uppercase tracking-widest bg-accent/15 text-accent hover:bg-accent/25 transition-colors disabled:opacity-50 disabled:cursor-wait"
-                  >
-                    {knowledgeSyncing ? "Working..." : knowledgeDocs.length > 0 ? "+ Add More Files" : "Select Drive Files"}
-                  </button>
-                  {knowledgeMsg && (
-                    <p className={`text-[0.55rem] mt-2 text-center ${knowledgeMsg.startsWith("✓") ? "text-secondary" : "text-muted/60"}`}>
-                      {knowledgeMsg}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <a
+            href="/knowledge"
+            className="flex items-center justify-between w-full px-4 py-3 rounded-xl border border-outline/15 bg-card/40 hover:bg-surface-high/30 hover:border-outline/30 transition-colors group"
+          >
+            <div className="flex items-center gap-2">
+              <svg className="w-3.5 h-3.5 text-accent/70 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="text-[0.6rem] font-bold uppercase tracking-widest text-muted">Company Knowledge</span>
+            </div>
+            <svg className="w-3 h-3 text-muted/40 group-hover:text-muted transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
         </div>
 
         {/* Sticky Run Buttons */}
@@ -1642,28 +1699,43 @@ export default function FlowPage() {
             </div>
           )}
 
-          {/* Run All */}
-          <button
-            onClick={runAll}
-            disabled={runAllActive || prospects.every(p => p.status === "running" || p.status === "completed")}
-            className={`w-full py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-[0.98] ${
-              runAllActive
-                ? "bg-accent/20 text-accent cursor-wait"
-                : "bg-accent text-white hover:bg-accent/90 shadow-[0_0_20px_rgba(128,131,255,0.25)]"
-            }`}
-          >
-            {runAllActive ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Running {prospects.filter(p => p.status === "running").length} / {CONCURRENCY} concurrent...
-              </span>
-            ) : (
-              prospects.length === 1 ? "Run Pipeline →" : `Run All ${prospects.length} →`
-            )}
-          </button>
+          {/* Run All / Stop */}
+          {prospects.some(p => p.status === "running") ? (
+            <button
+              onClick={() => {
+                prospects.filter(p => p.status === "running").forEach(p => stopProspect(p.id));
+                setRunAllActive(false);
+              }}
+              className="w-full py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-[0.98] bg-error/20 border border-error/30 text-error hover:bg-error/30 flex items-center justify-center gap-2"
+            >
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="4" y="4" width="16" height="16" rx="2" />
+              </svg>
+              Stop Pipeline
+            </button>
+          ) : (
+            <button
+              onClick={runAll}
+              disabled={runAllActive || prospects.every(p => p.status === "running" || p.status === "completed")}
+              className={`w-full py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-[0.98] ${
+                runAllActive
+                  ? "bg-accent/20 text-accent cursor-wait"
+                  : "bg-accent text-white hover:bg-accent/90 shadow-[0_0_20px_rgba(128,131,255,0.25)]"
+              }`}
+            >
+              {runAllActive ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Running {prospects.filter(p => p.status === "running").length} / {CONCURRENCY} concurrent...
+                </span>
+              ) : (
+                prospects.length === 1 ? "Run Pipeline →" : `Run All ${prospects.length} →`
+              )}
+            </button>
+          )}
 
           {/* Reset idle button — shown after some are done */}
           {prospects.some(p => p.status === "completed" || p.status === "failed") && (
@@ -1731,8 +1803,17 @@ export default function FlowPage() {
 
         {/* ── Phase: running — full-screen pipeline ── */}
         {selectedProspect?.status === "running" && !selectedProspect.result && (
-          <div className="flex-1 flex flex-col items-center justify-center px-12">
+          <div className="flex-1 flex flex-col items-center justify-center px-12 gap-4">
             <PipelineTimeline steps={selectedProspect.agents} fullscreen />
+            <button
+              onClick={() => stopProspect(selectedProspect.id)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-error/30 bg-error/10 text-error text-xs font-black uppercase tracking-widest hover:bg-error/20 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="4" y="4" width="16" height="16" rx="2" />
+              </svg>
+              Stop Pipeline
+            </button>
           </div>
         )}
 
@@ -1750,20 +1831,29 @@ export default function FlowPage() {
           </div>
         )}
 
-        {/* ── Phase: done — pipeline slides out, canvas takes over ── */}
+        {/* ── Phase: done — cross-fade between pipeline and output canvas ── */}
         {selectedProspect?.result && (
-          <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+          <div className="flex-1 relative overflow-hidden min-h-0">
+            {/* Pipeline fades out */}
             <div
-              className="shrink-0 overflow-hidden transition-all duration-700 ease-in-out"
+              className="absolute inset-0 flex flex-col items-center justify-center px-12 transition-all duration-700 ease-in-out"
               style={{
-                maxHeight: pipelineCollapsed ? "0px" : "120px",
                 opacity: pipelineCollapsed ? 0 : 1,
-                transform: pipelineCollapsed ? "translateY(-100%)" : "translateY(0)",
+                transform: pipelineCollapsed ? "translateY(-24px) scale(0.98)" : "translateY(0) scale(1)",
+                pointerEvents: pipelineCollapsed ? "none" : "auto",
               }}
             >
-              <PipelineTimeline steps={selectedProspect.agents} />
+              <PipelineTimeline steps={selectedProspect.agents} fullscreen />
             </div>
-            <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+            {/* Output canvas fades in */}
+            <div
+              className="absolute inset-0 flex flex-col overflow-hidden transition-all duration-700 ease-in-out"
+              style={{
+                opacity: pipelineCollapsed ? 1 : 0,
+                transform: pipelineCollapsed ? "translateY(0) scale(1)" : "translateY(24px) scale(0.98)",
+                pointerEvents: pipelineCollapsed ? "auto" : "none",
+              }}
+            >
               <OutputCanvas output={selectedProspect.result} running={false} onVerify={() => setVerifyOpen(true)} />
             </div>
           </div>

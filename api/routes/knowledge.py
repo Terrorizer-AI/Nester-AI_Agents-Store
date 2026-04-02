@@ -4,6 +4,7 @@ Knowledge API routes — Google Drive file picker + sync + company profile.
 GET  /knowledge/status          → connection status, doc count, last sync time
 GET  /knowledge/picker-config   → returns client_id + access_token for Google Picker
 POST /knowledge/files           → save selected file IDs from picker, trigger sync
+POST /knowledge/upload          → upload local files directly (PDF, DOCX, PPTX, TXT, MD, CSV)
 POST /knowledge/sync            → trigger manual re-sync of saved files
 GET  /knowledge/docs            → list synced docs
 GET  /knowledge/profile         → company master profile text
@@ -12,11 +13,16 @@ DELETE /knowledge/reset         → wipe all knowledge and re-sync from scratch
 
 from __future__ import annotations
 
+import io
 import logging
+import mimetypes
 import os
+import uuid
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import Form
 from pydantic import BaseModel
+from config.keys import get_api_key
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
@@ -68,7 +74,7 @@ async def get_knowledge_status():
         "last_sync": docs[0]["indexed_at"] if docs else None,
         "profile_generated": profile is not None,
         "profile_generated_at": profile.get("generated_at") if profile else None,
-        "google_client_id": os.environ.get("GOOGLE_CLIENT_ID", ""),
+        "google_client_id": get_api_key("GOOGLE_CLIENT_ID"),
     }
 
 
@@ -220,6 +226,108 @@ async def sync_knowledge(body: SyncRequest, background_tasks: BackgroundTasks):
 
     background_tasks.add_task(_run_sync)
     return {"message": f"Syncing {len(file_ids)} files in background"}
+
+
+UPLOAD_MIME_MAP = {
+    ".pdf":  "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".txt":  "text/plain",
+    ".md":   "text/markdown",
+    ".csv":  "text/csv",
+}
+
+
+@router.post("/upload")
+async def upload_files(
+    background_tasks: BackgroundTasks,
+    files: list[UploadFile] = File(...),
+):
+    """Upload local files directly — chunks, embeds, and indexes them."""
+    from memory.sqlite_ops import is_sqlite_ready, init_sqlite_ops
+
+    if not is_sqlite_ready():
+        init_sqlite_ops()
+
+    openai_key = _get_openai_key()
+    if not openai_key:
+        raise HTTPException(status_code=400, detail="OPENAI_API_KEY not set")
+
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    accepted = []
+    for f in files:
+        ext = os.path.splitext(f.filename or "")[1].lower()
+        if ext not in UPLOAD_MIME_MAP:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {ext}. Allowed: {', '.join(UPLOAD_MIME_MAP)}",
+            )
+        raw = await f.read()
+        accepted.append({"filename": f.filename, "ext": ext, "raw": raw})
+
+    def _run_index():
+        from knowledge.drive_sync import (
+            _chunk_text, _embed_chunks,
+            _extract_pdf_text, _extract_docx_text, _extract_pptx_text,
+        )
+        from memory.sqlite_ops import (
+            delete_knowledge_file, upsert_knowledge_chunk, upsert_knowledge_file,
+        )
+        from knowledge.profile_builder import build_company_profile
+        import datetime
+
+        any_indexed = False
+        for item in accepted:
+            ext = item["ext"]
+            raw: bytes = item["raw"]
+            filename: str = item["filename"] or "upload"
+            mime = UPLOAD_MIME_MAP[ext]
+
+            # Stable file_id based on filename so re-uploads replace old version
+            file_id = f"local_{uuid.uuid5(uuid.NAMESPACE_URL, filename)}"
+
+            try:
+                if ext == ".pdf":
+                    text = _extract_pdf_text(raw)
+                elif ext == ".docx":
+                    text = _extract_docx_text(raw)
+                elif ext == ".pptx":
+                    text = _extract_pptx_text(raw)
+                else:
+                    text = raw.decode("utf-8", errors="replace")
+
+                if not text.strip():
+                    logger.warning("[Upload] Empty content: %s", filename)
+                    continue
+
+                chunks = _chunk_text(text)
+                if not chunks:
+                    continue
+
+                embeddings = _embed_chunks(chunks, openai_key)
+                delete_knowledge_file(file_id)
+
+                for idx, (chunk, emb) in enumerate(zip(chunks, embeddings)):
+                    upsert_knowledge_chunk(file_id, filename, idx, chunk, emb)
+
+                modified_time = datetime.datetime.utcnow().isoformat() + "Z"
+                upsert_knowledge_file(file_id, filename, mime, modified_time, len(chunks))
+                any_indexed = True
+                logger.info("[Upload] Indexed %s → %d chunks", filename, len(chunks))
+
+            except Exception as exc:
+                logger.error("[Upload] Failed %s: %s", filename, exc)
+
+        if any_indexed:
+            try:
+                build_company_profile(openai_key)
+            except Exception as exc:
+                logger.error("[Upload] Profile build failed: %s", exc)
+
+    background_tasks.add_task(_run_index)
+    return {"message": f"Indexing {len(accepted)} file(s) in background", "files": [a["filename"] for a in accepted]}
 
 
 @router.delete("/files/{file_id}")

@@ -1,22 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #131318;
-  --foreground: #e4e1e9;
-  --card: #1f1f25;
-  --card-border: #2a292f;
-  --accent: #8083ff;
-  --accent-soft: #1a1a3e;
-  --accent-dim: #c0c1ff;
-  --secondary: #4edea3;
-  --tertiary: #ffb95f;
-  --surface-high: #2a292f;
-  --surface-low: #1b1b20;
-  --success: #4edea3;
-  --warning: #ffb95f;
-  --error: #ffb4ab;
-  --muted: #908fa0;
-  --outline: #464554;
+  --background: #000000;
+  --foreground: #f5f5f5;
+  --card: #0d0d0d;
+  --card-border: #1a1a1a;
+  --accent: #ef3139;
+  --accent-soft: #2a0608;
+  --accent-dim: #ff6b70;
+  --secondary: #22c55e;
+  --tertiary: #f97316;
+  --surface-high: #1a1a1a;
+  --surface-low: #080808;
+  --success: #22c55e;
+  --warning: #eab308;
+  --error: #fca5a5;
+  --muted: #71717a;
+  --outline: #27272a;
 }
 
 @theme inline {
@@ -50,7 +50,7 @@ body {
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #35343a; border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
 
 /* Animations */
 @keyframes pulse-ring {
@@ -77,7 +77,7 @@ body {
 .animate-fade-in { animation: fade-in 0.3s ease-out both; }
 
 .skeleton {
-  background: linear-gradient(90deg, #1f1f25 25%, #2a292f 50%, #1f1f25 75%);
+  background: linear-gradient(90deg, #0d0d0d 25%, #1a1a1a 50%, #0d0d0d 75%);
   background-size: 400px 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
@@ -90,22 +90,22 @@ body {
   width: 300%; height: 300%;
   left: -100%; top: -100%;
   border-radius: 50%;
-  background-color: #8083ff;
+  background-color: #ef3139;
   animation: pulse-ring 1.5s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
 }
 
 /* Glass effect */
-.glass { background: rgba(19, 19, 24, 0.75); backdrop-filter: blur(20px); }
+.glass { background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(20px); }
 
 /* Input borderless focus style */
 .input-borderless {
-  background: #0e0e13;
+  background: #000000;
   border: none;
-  border-bottom: 1px solid #464554;
+  border-bottom: 1px solid #27272a;
   border-radius: 0;
   transition: border-color 0.2s;
 }
 .input-borderless:focus {
   outline: none;
-  border-bottom-color: #8083ff;
+  border-bottom-color: #ef3139;
 }

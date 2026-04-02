@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import ConfirmModal from "@/components/ConfirmModal";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -56,6 +57,8 @@ export default function KnowledgePanel() {
   const [msg, setMsg] = useState("");
   const [tab, setTab] = useState<"docs" | "profile">("docs");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmDeleteFile, setConfirmDeleteFile] = useState<{ fileId: string; fileName: string } | null>(null);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -212,7 +215,6 @@ export default function KnowledgePanel() {
   };
 
   const handleReset = async () => {
-    if (!confirm("This wipes all indexed knowledge and re-syncs from scratch. Continue?")) return;
     setSyncing(true);
     setMsg("Resetting...");
     try {
@@ -226,7 +228,6 @@ export default function KnowledgePanel() {
   };
 
   const handleDeleteFile = async (fileId: string, fileName: string) => {
-    if (!confirm(`Remove "${fileName}" from the knowledge base?`)) return;
     setDeletingId(fileId);
     try {
       const res = await fetch(`${API}/knowledge/files/${fileId}`, { method: "DELETE" });
@@ -325,7 +326,7 @@ export default function KnowledgePanel() {
                 ⟳ Sync
               </button>
               <button
-                onClick={handleReset}
+                onClick={() => setConfirmReset(true)}
                 disabled={syncing}
                 className="py-2 px-3 text-xs rounded-lg border border-red-500/20 text-red-400/60 hover:text-red-400 transition-colors disabled:opacity-40"
                 title="Wipe and re-index"
@@ -371,7 +372,7 @@ export default function KnowledgePanel() {
                     </div>
                   </div>
                   <button
-                    onClick={() => handleDeleteFile(doc.file_id, doc.file_name)}
+                    onClick={() => setConfirmDeleteFile({ fileId: doc.file_id, fileName: doc.file_name })}
                     disabled={deletingId === doc.file_id}
                     className="ml-3 flex-shrink-0 opacity-0 group-hover/doc:opacity-100 transition-opacity px-2 py-1 rounded border border-red-500/20 text-red-400/60 hover:text-red-400 hover:border-red-500/40 text-[10px] font-bold disabled:opacity-30"
                     title="Remove from knowledge base"
@@ -414,6 +415,29 @@ export default function KnowledgePanel() {
           )}
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmReset}
+        title="Wipe all knowledge?"
+        message="This will delete all indexed documents and chunks, then re-sync from scratch. This cannot be undone."
+        confirmLabel="Wipe & Re-sync"
+        variant="danger"
+        onConfirm={() => { setConfirmReset(false); handleReset(); }}
+        onCancel={() => setConfirmReset(false)}
+      />
+
+      <ConfirmModal
+        open={!!confirmDeleteFile}
+        title="Remove document?"
+        message={confirmDeleteFile ? `"${confirmDeleteFile.fileName}" will be removed from the knowledge base. Agents will no longer have access to this content.` : ""}
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={() => {
+          if (confirmDeleteFile) handleDeleteFile(confirmDeleteFile.fileId, confirmDeleteFile.fileName);
+          setConfirmDeleteFile(null);
+        }}
+        onCancel={() => setConfirmDeleteFile(null)}
+      />
     </div>
   );
 }

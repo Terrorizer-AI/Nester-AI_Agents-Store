@@ -28,9 +28,13 @@ FIRECRAWL_BASE = "https://api.firecrawl.dev/v1"
 
 
 def _api_key() -> str:
-    key = os.environ.get("FIRECRAWL_API_KEY", "")
+    try:
+        from config.keys import get_api_key
+        key = get_api_key("FIRECRAWL_API_KEY")
+    except Exception:
+        key = os.environ.get("FIRECRAWL_API_KEY", "")
     if not key:
-        raise RuntimeError("FIRECRAWL_API_KEY not set")
+        raise RuntimeError("FIRECRAWL_API_KEY not set — configure it in Settings or .env")
     return key
 
 

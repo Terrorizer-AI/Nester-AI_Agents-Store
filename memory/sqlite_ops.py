@@ -144,6 +144,13 @@ CREATE TABLE IF NOT EXISTS integration_credentials (
     test_result TEXT DEFAULT 'untested'
 );
 
+-- API keys (user-set via Settings UI, override .env values)
+CREATE TABLE IF NOT EXISTS api_keys (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 -- Company knowledge chunks from Google Drive docs (with embeddings for similarity search)
 CREATE TABLE IF NOT EXISTS knowledge_chunks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -872,3 +879,40 @@ def clear_knowledge() -> None:
         conn.execute("DELETE FROM knowledge_chunks")
         conn.execute("DELETE FROM knowledge_files")
         conn.execute("DELETE FROM company_profile")
+
+
+# ── API Keys ──────────────────────────────────────────────────────────────────
+
+def set_api_key(key: str, value: str) -> None:
+    """Save or update a user-set API key in SQLite."""
+    with _transaction() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO api_keys (key, value, updated_at) VALUES (?, ?, ?)",
+            (key, value, _now_iso()),
+        )
+
+
+def get_api_key_from_db(key: str) -> str | None:
+    """Get a user-set API key from SQLite. Returns None if not set."""
+    try:
+        conn = _get_conn()
+        row = conn.execute("SELECT value FROM api_keys WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else None
+    except Exception:
+        return None
+
+
+def list_api_keys() -> list[dict[str, Any]]:
+    """List all stored API keys (names + masked values + updated_at)."""
+    try:
+        conn = _get_conn()
+        rows = conn.execute("SELECT key, value, updated_at FROM api_keys ORDER BY key").fetchall()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+
+def delete_api_key(key: str) -> None:
+    """Delete a user-set API key (falls back to .env value)."""
+    with _transaction() as conn:
+        conn.execute("DELETE FROM api_keys WHERE key = ?", (key,))
