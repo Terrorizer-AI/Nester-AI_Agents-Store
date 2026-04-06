@@ -18,6 +18,9 @@ from langchain_openai import ChatOpenAI
 logger = logging.getLogger(__name__)
 
 
+MAX_TOOL_RESULT_CHARS = 60_000  # ~15K tokens — keeps total context well under 128K
+
+
 async def run_tool_agent(
     llm: ChatOpenAI,
     tools: list[StructuredTool],
@@ -99,8 +102,11 @@ async def run_tool_agent(
                     )
                     result = f"Error calling {tool_name}: {exc}"
 
+            result_str = str(result)
+            if len(result_str) > MAX_TOOL_RESULT_CHARS:
+                result_str = result_str[:MAX_TOOL_RESULT_CHARS] + "\n\n[... truncated — full result was {:,} chars]".format(len(str(result)))
             lc_messages.append(
-                ToolMessage(content=str(result), tool_call_id=tool_call_id)
+                ToolMessage(content=result_str, tool_call_id=tool_call_id)
             )
 
     # Max iterations reached — return last response

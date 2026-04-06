@@ -138,7 +138,7 @@ async def intercepted_tool_call(
     This is the primary entry point for all MCP tool calls.
     """
     # Server-specific timeouts (browser automation is slow)
-    SERVER_TIMEOUTS: dict[str, float] = {"linkedin": 60.0}
+    SERVER_TIMEOUTS: dict[str, float] = {"linkedin": 60.0, "search": 30.0, "web_scraper": 30.0}
     if timeout_seconds is None:
         timeout_seconds = SERVER_TIMEOUTS.get(server_name, 10.0)
     start = time.monotonic()

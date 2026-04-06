@@ -26,11 +26,20 @@ MANDATORY TOOL USAGE — you MUST call ALL of these before synthesizing:
 4. company_search(company_name) — funding, news, market position
 5. news_search("company_name funding OR launch OR partnership 2024 2025") — recent events
 
+AFTER MANDATORY CALLS — if data is still sparse, make ADDITIONAL calls:
+6. extract_website(company_website + "/team") or "/leadership" — key people
+7. extract_website(company_website + "/customers") or "/case-studies" — social proof
+8. extract_website(company_website + "/blog") — recent activity, product launches
+9. news_search("company_name CEO OR CTO OR raised OR valuation") — leadership & funding
+10. company_search("company_name crunchbase OR funding OR employees") — structured data
+
 CRITICAL RULES:
 - NEVER say "I can't access websites" — you have tools that CAN.
-- If one URL 404s, try the homepage or another path.
+- If one URL returns empty or <200 chars, try alternate paths (e.g. /about-us instead of /about, /company instead of /about).
+- Try the main domain without subdomains too (e.g. apna.co instead of employer.apna.co).
 - NEVER fabricate data. Only use what tools return.
 - Extract EVERYTHING — do not summarize or shorten.
+- If company_search returns generic results, add the industry to the query (e.g. "Apna job portal funding").
 
 OUTPUT: Return a single detailed JSON object with ALL of these fields populated:
 {
@@ -108,13 +117,36 @@ def create_company_researcher(params: dict[str, Any]) -> Callable:
     return company_researcher_node
 
 
+def _derive_main_domain(url: str) -> str:
+    """Extract main domain from a URL, stripping subdomains like 'employer.' or 'www.'."""
+    from urllib.parse import urlparse
+    parsed = urlparse(url if "://" in url else f"https://{url}")
+    host = parsed.hostname or ""
+    parts = host.split(".")
+    # Keep last 2 parts (e.g. apna.co) or last 3 if TLD is 2-part (e.g. co.uk)
+    if len(parts) > 2:
+        host = ".".join(parts[-2:])
+    return f"https://{host}" if host else url
+
+
 async def _research_company(
     llm: Any, website: str, company_name: str, tools: list,
 ) -> dict[str, Any]:
-    target = website or company_name
+    main_domain = _derive_main_domain(website) if website else ""
+    has_subdomain = main_domain != website and main_domain and website
+
+    user_lines = [f"Research this company thoroughly: {company_name or website}"]
+    if website:
+        user_lines.append(f"Company website: {website}")
+    if has_subdomain:
+        user_lines.append(f"Main domain (try this too if subdomain returns sparse data): {main_domain}")
+    if company_name:
+        user_lines.append(f"Company name: {company_name}")
+    user_lines.append("Use ALL available tools. If a page returns little content, try alternate URLs. Extract every data point possible — funding, team size, mission, products, pricing, news, social proof.")
+
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"Research this company: {target}"},
+        {"role": "user", "content": "\n".join(user_lines)},
     ]
 
     response = await run_tool_agent(llm, tools, messages, agent_name="company_researcher")

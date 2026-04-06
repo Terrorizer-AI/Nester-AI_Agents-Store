@@ -88,6 +88,17 @@ function makeProspect(overrides: Partial<ProspectRow> = {}): ProspectRow {
   };
 }
 
+// ── In-flight pipeline tracker (survives component unmount) ─────────────────
+// Module-level map: prospectId → { promise, abortController }
+// This lives outside the component so navigation doesn't kill running fetches.
+
+interface InflightRun {
+  promise: Promise<{ output?: Record<string, unknown>; duration_ms?: number }>;
+  controller: AbortController;
+}
+
+const _inflightRuns = new Map<string, InflightRun>();
+
 // ── Session persistence (prospects queue survives navigation) ─────────────────
 
 const SESSION_KEY = "nester_prospects_session";
@@ -97,9 +108,11 @@ function loadSession(): { prospects: ProspectRow[]; selectedId: string } | null 
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // Reset any running state to idle — they won't resume
+    // Reset running state to idle ONLY if there's no in-flight fetch still alive
     const prospects = (parsed.prospects as ProspectRow[]).map(p =>
-      p.status === "running" ? { ...p, status: "idle" as const, agents: PIPELINE_STAGES.map(a => ({ ...a })) } : p
+      p.status === "running" && !_inflightRuns.has(p.id)
+        ? { ...p, status: "idle" as const, agents: PIPELINE_STAGES.map(a => ({ ...a })) }
+        : p
     );
     return { prospects, selectedId: parsed.selectedId || "" };
   } catch { return null; }
@@ -971,6 +984,35 @@ export default function FlowPage() {
     if (prospects.length > 0) saveSession(prospects, selectedId);
   }, [prospects, selectedId]);
 
+  // Reconnect to any in-flight pipeline runs that survived navigation
+  useEffect(() => {
+    _inflightRuns.forEach((inflight, prospectId) => {
+      inflight.promise.then(data => {
+        _inflightRuns.delete(prospectId);
+        setProspects(prev => prev.map(p => p.id !== prospectId ? p : {
+          ...p,
+          status: "completed",
+          result: data.output || {},
+          duration_ms: data.duration_ms || null,
+          agents: p.agents.map(a => ({ ...a, status: "completed" as const, durationMs: (data.duration_ms || 60000) / p.agents.length })),
+        }));
+      }).catch((err: unknown) => {
+        _inflightRuns.delete(prospectId);
+        if (err instanceof DOMException && err.name === "AbortError") {
+          setProspects(prev => prev.map(p => p.id !== prospectId ? p : {
+            ...p, status: "idle", agents: PIPELINE_STAGES.map(a => ({ ...a })),
+          }));
+        } else {
+          setProspects(prev => prev.map(p => p.id !== prospectId ? p : {
+            ...p, status: "failed",
+            agents: p.agents.map(a => a.status === "running" ? { ...a, status: "failed" as const } : a),
+          }));
+        }
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const updateSender = (field: keyof SenderProfile, value: string) =>
     setSenderForm(prev => ({ ...prev, [field]: value }));
@@ -1177,6 +1219,13 @@ export default function FlowPage() {
 
   // ── Stop a running prospect ───────────────────────────────────────────────
   const stopProspect = useCallback((prospectId: string) => {
+    // Abort via module-level tracker (primary)
+    const inflight = _inflightRuns.get(prospectId);
+    if (inflight) {
+      inflight.controller.abort();
+      _inflightRuns.delete(prospectId);
+    }
+    // Also clean up legacy ref
     const controller = abortControllersRef.current.get(prospectId);
     if (controller) {
       controller.abort();
@@ -1185,9 +1234,13 @@ export default function FlowPage() {
   }, []);
 
   // ── Run a single prospect ─────────────────────────────────────────────────
+  // The fetch runs in a module-level tracker (_inflightRuns) so it survives
+  // component unmount — navigating away won't kill the pipeline.
   const runProspect = useCallback(async (prospectId: string) => {
     const prospect = prospects.find(p => p.id === prospectId);
     if (!prospect || prospect.status === "running") return;
+    // Already in-flight from a previous mount? Just wait for it.
+    if (_inflightRuns.has(prospectId)) return;
 
     // Save profile on first run
     saveProfile(senderForm);
@@ -1199,9 +1252,9 @@ export default function FlowPage() {
       : p
     ));
     setSelectedId(prospectId);
-    setPipelineCollapsed(false); // always show full-screen pipeline when starting
+    setPipelineCollapsed(false);
 
-    // Create abort controller for this run
+    // Create abort controller — only used for manual Stop button
     const controller = new AbortController();
     abortControllersRef.current.set(prospectId, controller);
 
@@ -1221,31 +1274,36 @@ export default function FlowPage() {
       }, i * 8000));
     }
 
-    try {
-      const input = isSales ? {
-        linkedin_url: prospect.linkedin_url,
-        company_website: prospect.company_website,
-        company_linkedin_url: prospect.company_linkedin_url,
-        service_catalog: serviceTags.map(s => ({ name: s })),
-        sender_name: senderForm.sender_name,
-        sender_company: senderForm.sender_company,
-        sender_role: senderForm.sender_role,
-        value_proposition: senderForm.value_proposition,
-        target_pain_points: senderForm.target_pain_points,
-        ideal_outcome: senderForm.ideal_outcome,
-        email_tone: senderForm.email_tone,
-        case_studies: senderForm.case_studies,
-        cta_preference: senderForm.cta_preference,
-      } : {};
+    const input = isSales ? {
+      linkedin_url: prospect.linkedin_url,
+      company_website: prospect.company_website,
+      company_linkedin_url: prospect.company_linkedin_url,
+      service_catalog: serviceTags.map(s => ({ name: s })),
+      sender_name: senderForm.sender_name,
+      sender_company: senderForm.sender_company,
+      sender_role: senderForm.sender_role,
+      value_proposition: senderForm.value_proposition,
+      target_pain_points: senderForm.target_pain_points,
+      ideal_outcome: senderForm.ideal_outcome,
+      email_tone: senderForm.email_tone,
+      case_studies: senderForm.case_studies,
+      cta_preference: senderForm.cta_preference,
+    } : {};
 
-      const res = await fetch(`${API}/flow/${name}/invoke`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-        signal: controller.signal,
-      });
-      const data = await res.json();
+    // Launch fetch into module-level tracker — survives unmount
+    const fetchPromise = fetch(`${API}/flow/${name}/invoke`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+      signal: controller.signal,
+    }).then(res => res.json());
+
+    _inflightRuns.set(prospectId, { promise: fetchPromise, controller });
+
+    try {
+      const data = await fetchPromise;
       timers.forEach(clearTimeout);
+      _inflightRuns.delete(prospectId);
       abortControllersRef.current.delete(prospectId);
       setProspects(prev => prev.map(p => p.id !== prospectId ? p : {
         ...p,
@@ -1254,12 +1312,11 @@ export default function FlowPage() {
         duration_ms: data.duration_ms || null,
         agents: p.agents.map(a => ({ ...a, status: "completed" as const, durationMs: (data.duration_ms || 60000) / p.agents.length })),
       }));
-      setTimeout(() => setPipelineCollapsed(true), 2500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       timers.forEach(clearTimeout);
+      _inflightRuns.delete(prospectId);
       abortControllersRef.current.delete(prospectId);
-      // If aborted by user — reset to idle cleanly
-      if (err?.name === "AbortError") {
+      if (err instanceof DOMException && err.name === "AbortError") {
         setProspects(prev => prev.map(p => p.id !== prospectId ? p : {
           ...p,
           status: "idle",
@@ -1436,6 +1493,20 @@ export default function FlowPage() {
                             title="Run this prospect"
                           >
                             ▶
+                          </button>
+                        )}
+                        {prospect.status === "completed" && (
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setProspects(prev => prev.map(p =>
+                                p.id !== prospect.id ? p : { ...p, status: "idle" as const, result: null, duration_ms: null, agents: PIPELINE_STAGES.map(a => ({ ...a })) }
+                              ));
+                            }}
+                            className="text-[0.5rem] px-1.5 py-0.5 rounded bg-accent/20 text-accent hover:bg-accent/30 transition-colors font-bold"
+                            title="Re-run this prospect"
+                          >
+                            ↻ Re-run
                           </button>
                         )}
                         {prospect.status === "running" && (
@@ -1753,31 +1824,46 @@ export default function FlowPage() {
       {/* ── Right Output Canvas — full remaining space ─────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
 
-        {/* ── Prospect result tabs (shown when any prospect has a result) ── */}
-        {prospects.some(p => p.result || p.status === "running") && (
+        {/* ── Prospect tabs (switch + remove from top bar) ── */}
+        {prospects.length > 0 && (
           <div className="shrink-0 flex items-center gap-1 px-4 pt-3 pb-0 overflow-x-auto border-b border-outline/10 bg-surface-low/50">
-            {prospects
-              .filter(p => p.result || p.status === "running" || p.status === "failed")
-              .map((p, idx) => {
-                const name = (p.result as any)?.linkedin_parsed?.name
+            {prospects.map((p, idx) => {
+                const tabName = (p.result as any)?.linkedin_parsed?.name
                   || (p.result as any)?.persona?.name
                   || p.linkedin_url.split("/in/")[1]?.replace(/\/$/, "")
                   || `Prospect ${idx + 1}`;
                 const isSelected = p.id === selectedId;
-                const dotColor = p.status === "completed" ? "bg-secondary" : p.status === "running" ? "bg-accent animate-pulse" : "bg-error";
+                const dotColor = p.status === "completed" ? "bg-secondary"
+                  : p.status === "running" ? "bg-accent animate-pulse"
+                  : p.status === "failed" ? "bg-error"
+                  : "bg-muted/30";
                 return (
-                  <button
-                    key={p.id}
-                    onClick={() => setSelectedId(p.id)}
-                    className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-[0.6rem] font-bold uppercase tracking-wide transition-colors border-b-2 ${
-                      isSelected
-                        ? "text-foreground border-accent bg-surface-high/50"
-                        : "text-muted/50 border-transparent hover:text-muted hover:bg-surface-high/20"
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
-                    {name.length > 16 ? name.slice(0, 16) + "…" : name}
-                  </button>
+                  <div key={p.id} className="shrink-0 flex items-center group/tab">
+                    <button
+                      onClick={() => setSelectedId(p.id)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-[0.6rem] font-bold uppercase tracking-wide transition-colors border-b-2 ${
+                        isSelected
+                          ? "text-foreground border-accent bg-surface-high/50"
+                          : "text-muted/50 border-transparent hover:text-muted hover:bg-surface-high/20"
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                      {tabName.length > 16 ? tabName.slice(0, 16) + "…" : tabName}
+                    </button>
+                    {prospects.length > 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (p.status === "running") stopProspect(p.id);
+                          removeProspect(p.id);
+                        }}
+                        className="ml-[-4px] mr-1 text-[0.5rem] text-muted/30 hover:text-error transition-colors opacity-0 group-hover/tab:opacity-100"
+                        title={p.status === "running" ? "Stop & remove" : "Remove prospect"}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 );
               })}
           </div>
@@ -1836,7 +1922,7 @@ export default function FlowPage() {
           <div className="flex-1 relative overflow-hidden min-h-0">
             {/* Pipeline fades out */}
             <div
-              className="absolute inset-0 flex flex-col items-center justify-center px-12 transition-all duration-700 ease-in-out"
+              className="absolute inset-0 flex flex-col items-center justify-center px-12 gap-6 transition-all duration-700 ease-in-out"
               style={{
                 opacity: pipelineCollapsed ? 0 : 1,
                 transform: pipelineCollapsed ? "translateY(-24px) scale(0.98)" : "translateY(0) scale(1)",
@@ -1844,6 +1930,13 @@ export default function FlowPage() {
               }}
             >
               <PipelineTimeline steps={selectedProspect.agents} fullscreen />
+              <button
+                onClick={() => setPipelineCollapsed(true)}
+                className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-accent text-white text-sm font-black uppercase tracking-widest hover:bg-accent/90 active:scale-[0.98] transition-all shadow-[0_0_30px_rgba(128,131,255,0.4)]"
+              >
+                <span>View Results</span>
+                <span className="text-base">→</span>
+              </button>
             </div>
             {/* Output canvas fades in */}
             <div

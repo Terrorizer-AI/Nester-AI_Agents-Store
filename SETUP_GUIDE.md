@@ -20,14 +20,13 @@ Nester is your AI-powered sales research assistant. Give it a LinkedIn profile a
 
 ## What You'll Need Before Starting
 
-Only **2 API keys** are required to get started. Everything else can be added later inside the app.
+Only **1 API key** is required to get started. Everything else can be added later inside the app.
 
 | Key | Where to Get It | Required? |
 |-----|----------------|-----------|
-| **DeepSeek API Key** | [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) | **Yes** |
-| **OpenAI API Key** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | **Yes** (for knowledge base search only) |
+| **OpenAI API Key** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | **Yes** |
 
-> **Cost estimate:** DeepSeek is ~20x cheaper than OpenAI. Typical cost is $0.01–0.05 per prospect researched. OpenAI is only used for embeddings (knowledge base), not for chat.
+> **Cost estimate:** Uses GPT-4o for all agents + embeddings. Typical cost is $0.05–0.15 per prospect researched.
 
 All other keys (Firecrawl, Tavily, Calendly, Gmail, Google Drive) are added inside the app after it's running — no terminal needed.
 
@@ -58,7 +57,7 @@ The wizard will:
 1. Install Python & Node.js if missing
 2. Install all dependencies automatically
 3. Open a browser for LinkedIn login (one-time, session is saved)
-4. Ask for your **DeepSeek** and **OpenAI** keys
+4. Ask for your **OpenAI** key
 5. Install the `nester` command so you can run it from anywhere
 6. Start the platform and open your browser
 
@@ -138,10 +137,17 @@ Your API keys and data are always preserved.
 5. Click **Run Pipeline**
 6. Watch 8 AI agents work in real-time
 
+**Tips:**
+- You can navigate to other pages while a pipeline is running — it won't stop
+- Switch between prospects using the **top tabs** or the **sidebar**
+- Remove a prospect from either the top tab (✕) or the sidebar (✕)
+- After a pipeline completes, click **Re-run** to run it again with fresh data
+- Each email draft uses a **different case study** from your Knowledge base
+
 When complete, you'll see:
 - Full prospect profile and persona
 - Company intelligence report
-- Personalized outreach emails (multiple angles)
+- 3 personalized outreach emails (each with a different angle and case study)
 - Matched pain points and services
 
 ### Knowledge — Company Documents
@@ -200,7 +206,7 @@ nester logs frontend    # Frontend logs
 
 ### Pipeline failed or agent error
 
-- Check your **DeepSeek key** has credits: [platform.deepseek.com](https://platform.deepseek.com)
+- Check your **OpenAI key** has credits: [platform.openai.com](https://platform.openai.com)
 - Check the **LinkedIn URL** is a valid profile URL
 - Check the **company website** is accessible
 

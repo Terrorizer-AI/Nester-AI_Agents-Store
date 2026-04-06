@@ -279,13 +279,11 @@ if [ ! -f .env ]; then
         cat > .env << 'ENVEOF'
 # ── Nester Agent Platform Configuration ──
 
-# --- LLM Provider (DeepSeek for chat, OpenAI for embeddings) ---
-DEEPSEEK_API_KEY=your_deepseek_key
-DEEPSEEK_BASE_URL=https://api.deepseek.com
+# --- LLM Provider (OpenAI for all agents + embeddings) ---
 OPENAI_API_KEY=your_openai_key
-OPENAI_RESEARCH_MODEL=deepseek-chat
-OPENAI_SYNTHESIS_MODEL=deepseek-chat
-OPENAI_EMAIL_MODEL=deepseek-chat
+OPENAI_RESEARCH_MODEL=gpt-4o
+OPENAI_SYNTHESIS_MODEL=gpt-4o
+OPENAI_EMAIL_MODEL=gpt-4o
 
 # --- Web Scraping ---
 FIRECRAWL_API_KEY=your_firecrawl_key
@@ -328,14 +326,8 @@ echo -e "  ${DIM}All other keys (Firecrawl, Tavily, Calendly, Google, SMTP) can 
 echo -e "  ${DIM}added later in the app → API Keys page.${NC}"
 echo ""
 
-echo -e "  ${BOLD}${CYAN}1/2 — DeepSeek${NC} ${RED}(required)${NC}"
-echo -e "  ${DIM}Powers all AI agents — research, persona building, email writing.${NC}"
-echo -e "  ${DIM}Get yours at: https://platform.deepseek.com/api_keys${NC}"
-ask_key "DEEPSEEK_API_KEY" "Enter your DeepSeek API key:" "required"
-echo ""
-
-echo -e "  ${BOLD}${CYAN}2/2 — OpenAI${NC} ${RED}(required for knowledge base)${NC}"
-echo -e "  ${DIM}Used only for embeddings (company knowledge search). Not for chat.${NC}"
+echo -e "  ${BOLD}${CYAN}1/1 — OpenAI${NC} ${RED}(required)${NC}"
+echo -e "  ${DIM}Powers all AI agents (GPT-4o) + knowledge base embeddings.${NC}"
 echo -e "  ${DIM}Get yours at: https://platform.openai.com/api-keys${NC}"
 ask_key "OPENAI_API_KEY" "Enter your OpenAI API key:" "required"
 echo ""

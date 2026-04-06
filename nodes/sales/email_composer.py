@@ -125,7 +125,12 @@ Return valid JSON only — an array of exactly 3 email drafts, each using a DIFF
 RULES FOR THE 3 VARIANTS:
 - Each MUST open with a different data point (e.g. one opens on a LinkedIn post, one on a company milestone, one on a career move or pain point)
 - The subject lines must all be different
-- The value proposition angle can differ too (if multiple services match)
+- CRITICAL — DIFFERENT CASE STUDIES & SERVICES PER VARIANT:
+  Each variant MUST reference a DIFFERENT case study AND a DIFFERENT service line from the company knowledge (section 8).
+  For example, if variant 1 uses the Atlassian Jira case study + Cloud Foundation Nest,
+  variant 2 must use a DIFFERENT case study (e.g. Smart Home, Basepair, AI-first Bank) + a DIFFERENT service (e.g. Intelligence Nest, Human Experience Nest).
+  NEVER repeat the same case study or service across variants. If there are 5 case studies, pick 3 different ones.
+  If only 1 case study exists, vary the SERVICE LINE and angle for each variant.
 - Do NOT make one variant just a slight reword of another — they should feel like 3 distinct approaches
 - All 3 must pass the SWAP TEST and SPECIFICITY TEST"""
 
@@ -363,6 +368,8 @@ Primary Hook: {primary_hook}
 ━━━ 8. COMPANY KNOWLEDGE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ PRIMARY SOURCE — use this for all services, case studies, value prop, and proof.
 These are real facts from the sender's uploaded company documents. Quote them directly.
+⚠️ VARIETY RULE: Each of the 3 email variants MUST reference a DIFFERENT case study
+and a DIFFERENT service line from below. Do NOT use the same case study in all 3 emails.
 {knowledge_text if knowledge_text else "No company docs synced yet."}
 
 ━━━ 9. TARGETING BRIEF (manual overrides — use if section 8 is empty) ━
@@ -398,7 +405,8 @@ CTA Style: {cta}"""
         "  Hook C: A specific pain point, product positioning angle, or company challenge\n"
         "  IMPORTANT: If a post is about hiring a role likely filled (>3 months ago),\n"
         "  skip it and use the company mission/product angle instead.\n"
-        "Step 3 — For each hook, find the intersection with the sender's value proposition.\n"
+        "Step 3 — For each hook, pick a DIFFERENT service line AND case study from section 8 (company knowledge).\n"
+        "  Variant A must use a different case study than Variant B and C. Never repeat the same case study.\n"
         "Step 4 — Write all 3 emails following the structure in the system prompt (200-350 words each).\n"
         "Step 5 — Apply all 4 quality checks to EACH variant. Rewrite any that fail.\n\n"
         "CRITICAL REQUIREMENTS:\n"
