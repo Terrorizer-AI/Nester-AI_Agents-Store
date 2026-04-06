@@ -106,29 +106,30 @@ cd "$SCRIPT_DIR"
 
 step "Checking for new configuration keys"
 
-# Define all keys the platform needs with their defaults.
 # Only adds a key if it is completely missing from .env.
-declare -A KEY_DEFAULTS=(
-    ["DEEPSEEK_API_KEY"]="your_deepseek_key"
-    ["DEEPSEEK_BASE_URL"]="https://api.deepseek.com"
-    ["OPENAI_API_KEY"]="your_openai_key"
-    ["OPENAI_RESEARCH_MODEL"]="deepseek-chat"
-    ["OPENAI_SYNTHESIS_MODEL"]="deepseek-chat"
-    ["OPENAI_EMAIL_MODEL"]="deepseek-chat"
-    ["FIRECRAWL_API_KEY"]="your_firecrawl_key"
-    ["TAVILY_API_KEY"]="your_tavily_key"
-    ["NESTER_DATA_DIR"]="~/.nester"
-    ["LOG_LEVEL"]="INFO"
-    ["PLAYWRIGHT_HEADLESS"]="true"
-    ["BROWSER_POOL_SIZE"]="2"
-    ["BROWSER_PAGE_TIMEOUT_MS"]="30000"
-    ["DEFAULT_COST_BUDGET_PER_FLOW"]="0.50"
+# Format: "KEY=default_value"
+KEY_DEFAULTS=(
+    "DEEPSEEK_API_KEY=your_deepseek_key"
+    "DEEPSEEK_BASE_URL=https://api.deepseek.com"
+    "OPENAI_API_KEY=your_openai_key"
+    "OPENAI_RESEARCH_MODEL=deepseek-chat"
+    "OPENAI_SYNTHESIS_MODEL=deepseek-chat"
+    "OPENAI_EMAIL_MODEL=deepseek-chat"
+    "FIRECRAWL_API_KEY=your_firecrawl_key"
+    "TAVILY_API_KEY=your_tavily_key"
+    "NESTER_DATA_DIR=~/.nester"
+    "LOG_LEVEL=INFO"
+    "PLAYWRIGHT_HEADLESS=true"
+    "BROWSER_POOL_SIZE=2"
+    "BROWSER_PAGE_TIMEOUT_MS=30000"
+    "DEFAULT_COST_BUDGET_PER_FLOW=0.50"
 )
 
 new_keys=()
-for key in "${!KEY_DEFAULTS[@]}"; do
+for entry in "${KEY_DEFAULTS[@]}"; do
+    key="${entry%%=*}"
     if ! grep -q "^${key}=" .env 2>/dev/null; then
-        echo "${key}=${KEY_DEFAULTS[$key]}" >> .env
+        echo "$entry" >> .env
         new_keys+=("$key")
     fi
 done
