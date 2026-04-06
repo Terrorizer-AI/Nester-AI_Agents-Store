@@ -1,7 +1,7 @@
 # Nester Agent Platform — Setup Guide
 
-> **For sales professionals with zero coding experience.**
-> This guide will have you running in under 5 minutes.
+> **For anyone with zero coding experience.**
+> First-time setup takes about 5 minutes. Upgrading takes 1 command.
 
 ---
 
@@ -10,7 +10,7 @@
 Nester is your AI-powered sales research assistant. Give it a LinkedIn profile and a company website, and it will:
 
 - Research the prospect's background, role, and recent activity
-- Analyze the company — what they do, their tech stack, funding, and news
+- Analyze the company — products, tech stack, funding, and news
 - Build a detailed persona of your prospect
 - Match your services to their pain points
 - Write personalized outreach emails with unique Calendly links
@@ -18,35 +18,32 @@ Nester is your AI-powered sales research assistant. Give it a LinkedIn profile a
 
 ---
 
-## What You'll Need
+## What You'll Need Before Starting
 
-Before starting, have these ready:
+Only **2 API keys** are required to get started. Everything else can be added later inside the app.
 
-| Item | Where to Get It | Required? |
-|------|----------------|-----------|
-| **OpenAI API Key** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | Yes |
-| **Firecrawl API Key** | [firecrawl.dev](https://firecrawl.dev) | Yes |
-| **Tavily API Key** | [tavily.com](https://tavily.com) | Recommended |
-| **Calendly API Key** | [calendly.com/integrations/api_webhooks](https://calendly.com/integrations/api_webhooks) | Optional |
-| **Gmail App Password** | [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) | Optional (for sending emails) |
+| Key | Where to Get It | Required? |
+|-----|----------------|-----------|
+| **DeepSeek API Key** | [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) | **Yes** |
+| **OpenAI API Key** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | **Yes** (for knowledge base search only) |
 
-> **Cost estimate:** OpenAI usage is typically $0.10–$0.50 per prospect researched. Firecrawl and Tavily have free tiers.
+> **Cost estimate:** DeepSeek is ~20x cheaper than OpenAI. Typical cost is $0.01–0.05 per prospect researched. OpenAI is only used for embeddings (knowledge base), not for chat.
+
+All other keys (Firecrawl, Tavily, Calendly, Gmail, Google Drive) are added inside the app after it's running — no terminal needed.
 
 ---
 
-## Installation (One-Time Setup)
+## First-Time Installation
 
 ### Step 1: Open Terminal
 
-- On **Mac**: Press `Cmd + Space`, type **Terminal**, press Enter
-- On **Windows**: Press `Win + R`, type **cmd**, press Enter
+- **Mac:** Press `Cmd + Space`, type **Terminal**, press Enter
+- **Windows:** Press `Win + R`, type **cmd**, press Enter
 
 ### Step 2: Clone the Project
 
-Copy and paste this into your terminal, then press Enter:
-
 ```bash
-git clone https://github.com/Terrorizer-AI/nester-platform.git
+git clone https://github.com/Terrorizer-AI/Nester-AI_Agents-Store.git nester-platform
 cd nester-platform
 ```
 
@@ -58,144 +55,166 @@ chmod +x setup.sh && ./setup.sh
 
 The wizard will:
 
-1. **Check your system** — installs Python & Node.js if missing
-2. **Install dependencies** — sets up everything automatically
-3. **LinkedIn login** — a browser opens, you log into LinkedIn once (session is saved)
-4. **Ask for your API keys** — just paste them when prompted
-5. **Configure your email** — for sending outreach (optional)
-6. **Start the platform** — opens it in your browser
+1. Install Python & Node.js if missing
+2. Install all dependencies automatically
+3. Open a browser for LinkedIn login (one-time, session is saved)
+4. Ask for your **DeepSeek** and **OpenAI** keys
+5. Install the `nester` command so you can run it from anywhere
+6. Start the platform and open your browser
 
-> The wizard uses colored indicators so you can see progress:
+> **Progress indicators:**
 > - ✓ Green = done
-> - ⚠ Yellow = warning (non-critical)
+> - ⚠ Yellow = warning (non-critical, can fix later)
 > - ✗ Red = needs attention
 
-### Step 4: You're Done!
+### Step 4: Add Remaining Keys in the App
 
-Your browser will open to **http://localhost:3000** — that's your Nester dashboard.
+Once the app opens at **http://localhost:3000**:
+
+1. Click **API Keys** in the top nav
+2. Add your keys for the features you want:
+   - **Firecrawl** — company website scraping
+   - **Tavily** — web search for news and funding
+   - **Calendly** — booking links in outreach emails
+   - **SMTP (Gmail)** — for sending emails
+   - **Google Drive** — company knowledge base
+3. Keys save instantly — no restart needed
 
 ---
 
 ## Daily Usage
 
-### Starting Nester
-
-Open Terminal, go to the project folder, and run:
+After setup, use the `nester` command from **any folder** in your terminal:
 
 ```bash
-cd nester-platform
-./start.sh
+nester start    # Start the platform
+nester stop     # Stop all servers
+nester update   # Get latest updates & restart
+nester logs     # View backend logs
 ```
 
-This starts everything and opens your browser automatically.
+### Starting Nester
+
+```bash
+nester start
+```
+
+Opens **http://localhost:3000** in your browser automatically.
 
 ### Stopping Nester
 
 ```bash
-./stop.sh
+nester stop
 ```
+
+---
+
+## Upgrading (Getting Latest Changes)
+
+Whenever there are new features or fixes, run one command from anywhere:
+
+```bash
+nester update
+```
+
+This will automatically:
+1. Pull the latest code from GitHub
+2. Install any new dependencies
+3. Add any new config keys to your `.env` (never overwrites your existing keys)
+4. Restart all servers
+
+Your API keys and data are always preserved.
 
 ---
 
 ## Using the Platform
 
-### 1. Dashboard (Home Page)
-
-Your command center. Shows active flows, recent runs, and quick stats.
-
-### 2. Outreach (Run a Pipeline)
-
-This is where the magic happens:
+### Outreach — Run the Sales Pipeline
 
 1. Click **Outreach** in the top nav
-2. Enter the prospect's **LinkedIn URL** (e.g., `https://linkedin.com/in/johndoe`)
-3. Enter the **company website** (e.g., `https://acme.com`)
-4. Click **Run Pipeline**
-5. Watch the agents work in real-time — each step shows progress
-
-The pipeline runs these AI agents in sequence:
-
-```
-LinkedIn Research → Company Research → Company LinkedIn → Activity Analysis
-     → Persona Builder → Service Matcher → Email Composer → Output Formatter
-```
+2. Enter the prospect's **LinkedIn URL** (e.g. `https://linkedin.com/in/johndoe`)
+3. Enter the **company website** (e.g. `https://acme.com`)
+4. Optionally enter the **company LinkedIn URL**
+5. Click **Run Pipeline**
+6. Watch 8 AI agents work in real-time
 
 When complete, you'll see:
-- Full prospect profile
+- Full prospect profile and persona
 - Company intelligence report
 - Personalized outreach emails (multiple angles)
-- Pain points and service matches
+- Matched pain points and services
 
-### 3. History
+### Knowledge — Company Documents
 
-View all past pipeline runs:
-- See every prospect you've researched
-- Click any run to view the full detail — profile, emails, analysis
-- Filter by status (completed, failed, running)
+Upload your company docs (pitch deck, case studies, pricing, etc.) so agents reference your **real services** in emails:
 
-### 4. Chat
+1. Click **Knowledge** in the top nav
+2. Click **Add Files** to upload from your computer
+3. Or click **Google Drive** to pick files from Drive
+4. Files are indexed automatically — takes a few seconds
 
-Talk to your research data like ChatGPT:
+### History
 
-- **"Tell me about John Doe"** — get a summary of everything Nester found
-- **"Compare the two prospects I researched today"** — cross-reference data
-- **"What pain points does Acme Corp have?"** — pull insights
-- **"Draft a follow-up email for Sarah"** — generate new content based on research
+View all past pipeline runs, click any to see the full output.
 
-Your conversations are saved in the sidebar — pick up where you left off.
+### Chat
 
-### 5. Integrations
+Talk to your research data:
 
-Connect external services:
-- GitHub, Slack, Google (via OAuth)
-- Status indicators show what's connected
+- *"Tell me about John Doe"*
+- *"What pain points does Acme Corp have?"*
+- *"Draft a follow-up email for Sarah"*
+- *"Compare the two prospects I researched today"*
+
+### API Keys
+
+Manage all your API keys from the browser — no `.env` editing needed. Keys take effect instantly without a restart.
 
 ---
 
 ## Troubleshooting
 
-### "Nester won't start"
+### `nester: command not found`
+
+The `nester` command is installed during `setup.sh`. If you skipped setup or it didn't install:
 
 ```bash
-./stop.sh        # Kill any stuck processes
-./start.sh       # Try again
+cd nester-platform
+./setup.sh
 ```
 
-If it still doesn't work, check the logs:
-```bash
-cat /tmp/nester-backend.log
-cat /tmp/nester-frontend.log
-```
+After setup completes, open a new terminal tab and `nester` will work.
 
-### "Pipeline failed" or "Agent error"
-
-- **Check your OpenAI key** — make sure it has credits: [platform.openai.com/usage](https://platform.openai.com/usage)
-- **Check the LinkedIn URL** — must be a valid profile URL
-- **Check the company website** — must be accessible
-
-### "Chat says it has no data"
-
-The chat uses data from completed pipeline runs. Make sure you've run at least one successful pipeline first.
-
-### "Emails aren't sending"
-
-1. Make sure `SMTP_USER` and `SMTP_PASSWORD` are set in your `.env` file
-2. The password must be a **Gmail App Password** (not your regular Gmail password)
-3. Get one at: [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
-
-### Need to update API keys?
-
-Open the `.env` file in any text editor:
+### Nester won't start
 
 ```bash
-open .env        # Mac
-notepad .env     # Windows
+nester stop     # Kill any stuck processes
+nester start    # Try again
 ```
 
-Change the value, save, then restart:
+Check logs if it still fails:
 ```bash
-./stop.sh && ./start.sh
+nester logs             # Backend logs
+nester logs frontend    # Frontend logs
 ```
+
+### Pipeline failed or agent error
+
+- Check your **DeepSeek key** has credits: [platform.deepseek.com](https://platform.deepseek.com)
+- Check the **LinkedIn URL** is a valid profile URL
+- Check the **company website** is accessible
+
+### Emails aren't sending
+
+Go to **API Keys** page in the app and set:
+- `SMTP Email Address` — your Gmail address
+- `SMTP App Password` — a Gmail App Password (not your regular password)
+
+Get one at: [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+
+### Need to change an API key?
+
+Go to **API Keys** in the app — update it there. No terminal, no restart needed.
 
 ---
 
@@ -203,19 +222,19 @@ Change the value, save, then restart:
 
 | Command | What It Does |
 |---------|-------------|
-| `./setup.sh` | First-time installation wizard |
-| `./start.sh` | Start Nester (daily use) |
-| `./stop.sh` | Stop all servers |
-| `open .env` | Edit your API keys |
+| `nester start` | Start the platform |
+| `nester stop` | Stop all servers |
+| `nester update` | Pull latest changes & restart |
+| `nester logs` | View backend logs |
 
 | URL | What It Is |
 |-----|-----------|
-| http://localhost:3000 | Nester Dashboard (your main interface) |
-| http://localhost:8000/docs | API Documentation (for advanced users) |
+| http://localhost:3000 | Nester Dashboard |
+| http://localhost:8000/docs | API docs (advanced users) |
 
 ---
 
 ## Support
 
-Having issues? Create a ticket at:
-**https://github.com/Terrorizer-AI/nester-platform/issues**
+Having issues? Open a ticket at:
+**https://github.com/Terrorizer-AI/Nester-AI_Agents-Store/issues**
