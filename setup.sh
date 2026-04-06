@@ -318,180 +318,26 @@ else
     ok ".env file exists"
 fi
 
-# ── Step 6: API Key Wizard ───────────────────────────────────────────────────
+# ── Step 6: API Key Setup (minimum required only) ────────────────────────────
 
 step "API Key Setup"
 
 echo ""
-echo -e "  ${BOLD}Nester needs a few API keys to power its sales research.${NC}"
-echo -e "  ${DIM}We'll walk through each one. Only 2 are required.${NC}"
+echo -e "  ${BOLD}Only 2 keys are needed to start.${NC}"
+echo -e "  ${DIM}All other keys (Firecrawl, Tavily, Calendly, Google, SMTP) can be${NC}"
+echo -e "  ${DIM}added later in the app → API Keys page.${NC}"
 echo ""
 
-echo -e "  ${BOLD}${CYAN}1/5 — DeepSeek${NC} ${RED}(required)${NC}"
+echo -e "  ${BOLD}${CYAN}1/2 — DeepSeek${NC} ${RED}(required)${NC}"
 echo -e "  ${DIM}Powers all AI agents — research, persona building, email writing.${NC}"
 echo -e "  ${DIM}Get yours at: https://platform.deepseek.com/api_keys${NC}"
 ask_key "DEEPSEEK_API_KEY" "Enter your DeepSeek API key:" "required"
 echo ""
 
-echo -e "  ${BOLD}${CYAN}2/5 — OpenAI${NC} ${RED}(required for knowledge base)${NC}"
+echo -e "  ${BOLD}${CYAN}2/2 — OpenAI${NC} ${RED}(required for knowledge base)${NC}"
 echo -e "  ${DIM}Used only for embeddings (company knowledge search). Not for chat.${NC}"
 echo -e "  ${DIM}Get yours at: https://platform.openai.com/api-keys${NC}"
 ask_key "OPENAI_API_KEY" "Enter your OpenAI API key:" "required"
-echo ""
-
-echo -e "  ${BOLD}${CYAN}3/5 — Firecrawl${NC} ${RED}(required)${NC}"
-echo -e "  ${DIM}Scrapes company websites for research data.${NC}"
-echo -e "  ${DIM}Get yours at: https://firecrawl.dev${NC}"
-ask_key "FIRECRAWL_API_KEY" "Enter your Firecrawl API key:" "required"
-echo ""
-
-echo -e "  ${BOLD}${CYAN}4/5 — Tavily${NC} ${YELLOW}(recommended)${NC}"
-echo -e "  ${DIM}Web search for company news, funding, and market intel.${NC}"
-echo -e "  ${DIM}Get yours at: https://tavily.com${NC}"
-ask_key "TAVILY_API_KEY" "Enter your Tavily API key:" "optional"
-echo ""
-
-echo -e "  ${BOLD}${CYAN}5/5 — Calendly${NC} ${DIM}(optional)${NC}"
-echo -e "  ${DIM}Generates unique booking links in outreach emails.${NC}"
-echo -e "  ${DIM}Get yours at: https://calendly.com/integrations/api_webhooks${NC}"
-ask_key "CALENDLY_API_KEY" "Enter your Calendly API key:" "optional"
-
-# Auto-fetch Calendly user URI and event type if key was provided
-calendly_key=$(grep "^CALENDLY_API_KEY=" .env 2>/dev/null | cut -d'=' -f2-)
-if [ -n "$calendly_key" ] && [ "$calendly_key" != "your_calendly_key" ]; then
-    info "Fetching your Calendly account details..."
-
-    # Get user URI
-    user_uri=$(curl -s -H "Authorization: Bearer $calendly_key" \
-        "https://api.calendly.com/users/me" 2>/dev/null | \
-        python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('resource',{}).get('uri',''))" 2>/dev/null || true)
-
-    if [ -n "$user_uri" ]; then
-        # Add or update CALENDLY_USER_URI in .env
-        if grep -q "^CALENDLY_USER_URI=" .env 2>/dev/null; then
-            sed "s|^CALENDLY_USER_URI=.*|CALENDLY_USER_URI=${user_uri}|" .env > .env.tmp && mv .env.tmp .env
-        else
-            echo "CALENDLY_USER_URI=${user_uri}" >> .env
-        fi
-
-        # Get scheduling URL for static fallback
-        sched_url=$(curl -s -H "Authorization: Bearer $calendly_key" \
-            "https://api.calendly.com/users/me" 2>/dev/null | \
-            python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('resource',{}).get('scheduling_url',''))" 2>/dev/null || true)
-
-        if [ -n "$sched_url" ]; then
-            if grep -q "^CALENDLY_SCHEDULING_URL=" .env 2>/dev/null; then
-                sed "s|^CALENDLY_SCHEDULING_URL=.*|CALENDLY_SCHEDULING_URL=${sched_url}|" .env > .env.tmp && mv .env.tmp .env
-            else
-                echo "CALENDLY_SCHEDULING_URL=${sched_url}" >> .env
-            fi
-        fi
-
-        # Get first event type URI
-        event_uri=$(curl -s -H "Authorization: Bearer $calendly_key" \
-            "https://api.calendly.com/event_types?user=${user_uri}&active=true" 2>/dev/null | \
-            python3 -c "import sys,json; d=json.load(sys.stdin); evts=d.get('collection',[]); print(evts[0]['uri'] if evts else '')" 2>/dev/null || true)
-
-        if [ -n "$event_uri" ]; then
-            if grep -q "^CALENDLY_EVENT_TYPE_URI=" .env 2>/dev/null; then
-                sed "s|^CALENDLY_EVENT_TYPE_URI=.*|CALENDLY_EVENT_TYPE_URI=${event_uri}|" .env > .env.tmp && mv .env.tmp .env
-            else
-                echo "CALENDLY_EVENT_TYPE_URI=${event_uri}" >> .env
-            fi
-            ok "Calendly configured (event type + scheduling link auto-detected)"
-        else
-            warn "Could not find an active event type — create one at calendly.com first"
-        fi
-    else
-        warn "Could not verify Calendly API key — check it's correct"
-    fi
-fi
-echo ""
-
-# ── Step 7: Sender Profile ───────────────────────────────────────────────────
-
-step "Sender Profile (for outreach emails)"
-
-echo ""
-echo -e "  ${DIM}These details appear in your outreach emails.${NC}"
-echo -e "  ${DIM}Press Enter to skip any field.${NC}"
-echo ""
-
-# SMTP email for sending
-current_smtp=$(grep "^SMTP_USER=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || true)
-if [ -z "$current_smtp" ]; then
-    echo -ne "  ${BOLD}Your email address (Gmail): ${NC}"
-    read -r smtp_email
-    if [ -n "$smtp_email" ]; then
-        sed "s|^SMTP_USER=.*|SMTP_USER=${smtp_email}|" .env > .env.tmp && mv .env.tmp .env
-        ok "Email set: $smtp_email"
-
-        echo ""
-        echo -e "  ${DIM}To send emails, you need a Gmail App Password.${NC}"
-        echo -e "  ${DIM}1. Go to https://myaccount.google.com/apppasswords${NC}"
-        echo -e "  ${DIM}2. Create a new app password for 'Nester'${NC}"
-        echo -e "  ${DIM}3. Copy the 16-character password${NC}"
-        echo ""
-        echo -ne "  ${BOLD}Gmail App Password: ${NC}"
-        read -rs smtp_pass
-        echo ""
-        if [ -n "$smtp_pass" ]; then
-            sed "s|^SMTP_PASSWORD=.*|SMTP_PASSWORD=\"${smtp_pass}\"|" .env > .env.tmp && mv .env.tmp .env
-            ok "Email password saved"
-        fi
-    fi
-else
-    ok "Email already configured: $current_smtp"
-fi
-
-# ── Step 8: Google Drive (Company Knowledge) ─────────────────────────────────
-
-step "Google Drive — Company Knowledge"
-
-echo ""
-echo -e "  ${DIM}Connect Google Drive so Nester can read your company docs${NC}"
-echo -e "  ${DIM}(pitch deck, case studies, service catalog, pricing, etc.)${NC}"
-echo -e "  ${DIM}These docs make emails reference REAL services and case studies.${NC}"
-echo ""
-
-# Ask for folder ID
-current_folder_id=$(grep "^GOOGLE_DRIVE_FOLDER_ID=" .env 2>/dev/null | cut -d'=' -f2- || true)
-if [ -z "$current_folder_id" ] || [ "$current_folder_id" = "" ]; then
-    echo -e "  ${DIM}Create a folder in Google Drive, upload your company docs,${NC}"
-    echo -e "  ${DIM}then copy the folder ID from the URL:${NC}"
-    echo -e "  ${DIM}drive.google.com/drive/folders/${BOLD}YOUR_FOLDER_ID${NC}${DIM}  ← this part${NC}"
-    echo ""
-    echo -ne "  ${BOLD}Google Drive Folder ID (or press Enter to skip): ${NC}"
-    read -r gdrive_folder_id
-    if [ -n "$gdrive_folder_id" ]; then
-        if grep -q "^GOOGLE_DRIVE_FOLDER_ID=" .env 2>/dev/null; then
-            sed "s|^GOOGLE_DRIVE_FOLDER_ID=.*|GOOGLE_DRIVE_FOLDER_ID=${gdrive_folder_id}|" .env > .env.tmp && mv .env.tmp .env
-        else
-            echo "GOOGLE_DRIVE_FOLDER_ID=${gdrive_folder_id}" >> .env
-        fi
-        ok "Google Drive folder ID saved"
-    else
-        warn "Skipped — you can add GOOGLE_DRIVE_FOLDER_ID to .env later"
-    fi
-else
-    ok "Google Drive folder already configured: $current_folder_id"
-fi
-
-# Check for credentials.json
-creds_file="$HOME/.credentials/credentials.json"
-if [ ! -f "$creds_file" ]; then
-    echo ""
-    echo -e "  ${YELLOW}⚠${NC}  Google credentials.json not found at ~/.credentials/credentials.json"
-    echo -e "  ${DIM}To set up Google Drive access:${NC}"
-    echo -e "  ${DIM}1. Go to console.cloud.google.com → New project${NC}"
-    echo -e "  ${DIM}2. Enable the Google Drive API${NC}"
-    echo -e "  ${DIM}3. Create OAuth 2.0 credentials (Desktop app)${NC}"
-    echo -e "  ${DIM}4. Download credentials.json${NC}"
-    echo -e "  ${DIM}5. Place it at: ~/.credentials/credentials.json${NC}"
-    echo -e "  ${DIM}Then visit Settings → Company Knowledge in the app to sync.${NC}"
-else
-    ok "Google credentials.json found"
-fi
 echo ""
 
 # ── Step 9: Install global `nester` command ──────────────────────────────────
