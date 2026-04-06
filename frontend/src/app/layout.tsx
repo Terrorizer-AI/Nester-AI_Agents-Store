@@ -24,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
+      <body suppressHydrationWarning className="min-h-full flex flex-col bg-background text-foreground font-sans">
         <nav className="fixed top-0 w-full z-50 glass border-b border-outline/20 h-14 flex items-center px-10 justify-between">
           <div className="flex items-center gap-10">
             <a href="/" className="flex items-center">

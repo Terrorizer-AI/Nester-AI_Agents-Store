@@ -955,16 +955,82 @@ export default function FlowPage() {
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
   const knowledgePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load saved profile on mount
+  // Load saved profile on mount — if none, auto-fill from knowledge base
   useEffect(() => {
     const p = loadSavedProfile();
-    if (p) {
+    if (p && p.sender_name) {
       setSavedProfile(p);
       setSenderForm(p);
       setProfileMode("saved");
       if (p.services) setServiceTags(p.services.split(",").map(s => s.trim()).filter(s => s && s !== "[object Object]"));
+      setProfileLoaded(true);
+      return;
     }
-    setProfileLoaded(true);
+
+    // No saved profile — try to auto-fill from knowledge base company profile
+    (async () => {
+      try {
+        const res = await fetch(`${API}/knowledge/profile`);
+        if (!res.ok) { setProfileLoaded(true); return; }
+        const data = await res.json();
+        const profile = data.profile as string | null;
+        if (!profile) { setProfileLoaded(true); return; }
+
+        // Parse key fields from the markdown profile
+        const extract = (label: string): string => {
+          const re = new RegExp(`\\*\\*${label}:\\*\\*\\s*(.+)`, "i");
+          const m = profile.match(re);
+          return m ? m[1].trim() : "";
+        };
+        const extractList = (label: string): string => {
+          const re = new RegExp(`\\*\\*${label}:\\*\\*([\\s\\S]*?)(?=\\n\\*\\*|\\n##|$)`, "i");
+          const m = profile.match(re);
+          if (!m) return "";
+          return m[1]
+            .split("\n")
+            .map(l => l.replace(/^\s*-\s*/, "").replace(/\*\*/g, "").trim())
+            .filter(Boolean)
+            .join(", ");
+        };
+
+        const companyName = extract("Company Name");
+        const services = extractList("Core Products/Services")
+          || extractList("Services");
+        const valueProp = extractList("Unique Selling Points")
+          || extractList("Key Benefits");
+        const painPoints = extractList("Pain Points Solved");
+        const caseStudies = extractList("Case Studies & Results")
+          || extractList("CASE STUDIES");
+
+        // Extract founders for sender name suggestion
+        const foundersMatch = profile.match(/\*\*Founders\/Leadership:\*\*([\s\S]*?)(?=\n##|$)/i);
+        const firstFounder = foundersMatch
+          ? foundersMatch[1].split("\n").map(l => l.replace(/^\s*-\s*\*\*/, "").replace(/\*\*.*/, "").trim()).filter(Boolean)[0] || ""
+          : "";
+
+        const autoProfile: SenderProfile = {
+          sender_name: firstFounder,
+          sender_company: companyName,
+          sender_role: "",
+          services,
+          value_proposition: valueProp,
+          target_pain_points: painPoints,
+          ideal_outcome: "",
+          case_studies: caseStudies,
+          email_tone: "professional",
+          cta_preference: "soft",
+        };
+
+        // Only auto-fill if we got at least the company name
+        if (companyName) {
+          setSenderForm(autoProfile);
+          if (services) setServiceTags(services.split(",").map(s => s.trim()).filter(Boolean));
+          setProfileMode("new");
+        }
+      } catch { /* knowledge base not available — leave blank */ }
+      setProfileLoaded(true);
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Restore session from sessionStorage after mount (avoids SSR hydration mismatch)
