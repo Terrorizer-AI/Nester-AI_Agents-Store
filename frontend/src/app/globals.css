@@ -1,27 +1,7 @@
 @import "tailwindcss";
 
-/* ── Dark theme (default) ── */
+/* ── Light theme (default) ── */
 :root {
-  --background: #000000;
-  --foreground: #f5f5f5;
-  --card: #0d0d0d;
-  --card-border: #1a1a1a;
-  --accent: #ef3139;
-  --accent-soft: #2a0608;
-  --accent-dim: #ff6b70;
-  --secondary: #22c55e;
-  --tertiary: #f97316;
-  --surface-high: #1a1a1a;
-  --surface-low: #080808;
-  --success: #22c55e;
-  --warning: #eab308;
-  --error: #e53e3e;
-  --muted: #71717a;
-  --outline: #27272a;
-}
-
-/* ── Light theme ── */
-[data-theme="light"] {
   --background: #ffffff;
   --foreground: #0a0a0a;
   --card: #f9f9f9;
@@ -38,6 +18,26 @@
   --error: #dc2626;
   --muted: #71717a;
   --outline: #d4d4d8;
+}
+
+/* ── Dark theme ── */
+[data-theme="dark"] {
+  --background: #000000;
+  --foreground: #f5f5f5;
+  --card: #0d0d0d;
+  --card-border: #1a1a1a;
+  --accent: #ef3139;
+  --accent-soft: #2a0608;
+  --accent-dim: #ff6b70;
+  --secondary: #22c55e;
+  --tertiary: #f97316;
+  --surface-high: #1a1a1a;
+  --surface-low: #080808;
+  --success: #22c55e;
+  --warning: #eab308;
+  --error: #e53e3e;
+  --muted: #71717a;
+  --outline: #27272a;
 }
 
 @theme inline {
@@ -116,8 +116,8 @@ body {
 }
 
 /* Glass effect */
-.glass { background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(20px); }
-[data-theme="light"] .glass { background: rgba(255, 255, 255, 0.85); }
+.glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); }
+[data-theme="dark"] .glass { background: rgba(0, 0, 0, 0.75); }
 
 /* Input borderless focus style */
 .input-borderless {
@@ -132,9 +132,9 @@ body {
   border-bottom-color: var(--accent);
 }
 
-/* Logo invert — white on dark, normal on light */
-.theme-logo { filter: invert(1); }
-[data-theme="light"] .theme-logo { filter: invert(0); }
+/* Logo invert — normal on light (default), white on dark */
+.theme-logo { filter: invert(0); }
+[data-theme="dark"] .theme-logo { filter: invert(1); }
 
 /* Theme transition */
 *, *::before, *::after {

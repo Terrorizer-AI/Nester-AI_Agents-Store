@@ -5,13 +5,13 @@ import { useEffect, useState } from "react";
 const THEME_KEY = "nester_theme";
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<"dark" | "light">("light");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const saved = (localStorage.getItem(THEME_KEY) as "dark" | "light") || "dark";
+    const saved = (localStorage.getItem(THEME_KEY) as "dark" | "light") || "light";
     setTheme(saved);
-    document.documentElement.setAttribute("data-theme", saved === "light" ? "light" : "");
+    document.documentElement.setAttribute("data-theme", saved === "dark" ? "dark" : "");
     setMounted(true);
   }, []);
 
@@ -19,7 +19,7 @@ export default function ThemeToggle() {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
     localStorage.setItem(THEME_KEY, next);
-    document.documentElement.setAttribute("data-theme", next === "light" ? "light" : "");
+    document.documentElement.setAttribute("data-theme", next === "dark" ? "dark" : "");
   };
 
   if (!mounted) return <div className="w-8 h-4" />;
