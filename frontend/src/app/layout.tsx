@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,7 +29,7 @@ export default function RootLayout({
         <nav className="fixed top-0 w-full z-50 glass border-b border-outline/20 h-14 flex items-center px-10 justify-between">
           <div className="flex items-center gap-10">
             <a href="/" className="flex items-center">
-              <img src="/nester-logo.svg" alt="Nester" className="h-6 invert" />
+              <img src="/nester-logo.svg" alt="Nester" className="h-6 theme-logo" />
             </a>
             <div className="hidden md:flex gap-6">
               {[
@@ -51,8 +52,9 @@ export default function RootLayout({
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <div className="w-7 h-7 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center overflow-hidden">
-              <img src="/nester-logo.svg" alt="N" className="h-4 invert" />
+              <img src="/nester-logo.svg" alt="N" className="h-4 theme-logo" />
             </div>
           </div>
         </nav>

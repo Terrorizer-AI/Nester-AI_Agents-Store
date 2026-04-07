@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* ── Dark theme (default) ── */
 :root {
   --background: #000000;
   --foreground: #f5f5f5;
@@ -14,9 +15,29 @@
   --surface-low: #080808;
   --success: #22c55e;
   --warning: #eab308;
-  --error: #fca5a5;
+  --error: #e53e3e;
   --muted: #71717a;
   --outline: #27272a;
+}
+
+/* ── Light theme ── */
+[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #f9f9f9;
+  --card-border: #e4e4e7;
+  --accent: #dc2626;
+  --accent-soft: #fee2e2;
+  --accent-dim: #dc2626;
+  --secondary: #16a34a;
+  --tertiary: #ea580c;
+  --surface-high: #f4f4f5;
+  --surface-low: #fafafa;
+  --success: #16a34a;
+  --warning: #ca8a04;
+  --error: #dc2626;
+  --muted: #71717a;
+  --outline: #d4d4d8;
 }
 
 @theme inline {
@@ -50,7 +71,7 @@ body {
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: var(--outline); border-radius: 10px; }
 
 /* Animations */
 @keyframes pulse-ring {
@@ -77,7 +98,7 @@ body {
 .animate-fade-in { animation: fade-in 0.3s ease-out both; }
 
 .skeleton {
-  background: linear-gradient(90deg, #0d0d0d 25%, #1a1a1a 50%, #0d0d0d 75%);
+  background: linear-gradient(90deg, var(--card) 25%, var(--surface-high) 50%, var(--card) 75%);
   background-size: 400px 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
@@ -96,16 +117,26 @@ body {
 
 /* Glass effect */
 .glass { background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(20px); }
+[data-theme="light"] .glass { background: rgba(255, 255, 255, 0.85); }
 
 /* Input borderless focus style */
 .input-borderless {
-  background: #000000;
+  background: var(--background);
   border: none;
-  border-bottom: 1px solid #27272a;
+  border-bottom: 1px solid var(--outline);
   border-radius: 0;
   transition: border-color 0.2s;
 }
 .input-borderless:focus {
   outline: none;
-  border-bottom-color: #ef3139;
+  border-bottom-color: var(--accent);
+}
+
+/* Logo invert — white on dark, normal on light */
+.theme-logo { filter: invert(1); }
+[data-theme="light"] .theme-logo { filter: invert(0); }
+
+/* Theme transition */
+*, *::before, *::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
 }
